@@ -5,7 +5,7 @@
 # Author: Timo van Opstal
 #---------------------------
 
-from finity import *
+from nutils import *
 import numpy, time
 
 class KLshell:
@@ -42,6 +42,12 @@ class KLshell:
     self.c0 = .5 * params['E'] * params['h'] / (1-params['nu']**2)
     self.c1 = self.c0*params['h']**2 / 12.
 
+    # Function definitions
+    self.energy, self.stiffness = {
+        'local':(self.energy_local,   self.stiffness_local),
+      'classic':(self.energy_classic, self.stiffness_classic),
+      'parfree':(self.energy_parfree, self.stiffness_parfree)}[self.form]
+
   @property
   @core.cache
   def det( self ):
@@ -72,13 +78,8 @@ class KLshell:
   def assemble( self, func, **kwargs ):
     'Integrate over parametric domain.'
     kwargs.setdefault( 'ischeme', self.params['ischeme'] )
-    kwargs['iweights'] = function.IWeights() if self.form=='local' else None
+    kwargs['iweights'] = self.det * function.IWeights() if self.form=='local' else None
     kwargs['coords'] = None if self.form=='local' else self.X
-    if self.form=='local':
-      if not isinstance( func, list ):
-        func *= self.det
-      else:
-        func = [f*self.det for f in func]
     return self.domain.integrate( func, **kwargs )
 
   def energy_local( self, x ):
@@ -95,8 +96,8 @@ class KLshell:
     kappa = (hess * norm[:,_,_]).sum( 0 ) - \
             (Hess * Norm[:,_,_]).sum( 0 )
 
-    return self.c0 * ( (self.constit * epsilon[:,:,_,_]).sum([0,1]) * epsilon ).sum([0,1]) \
-         + self.c1 * ( (self.constit * kappa[:,:,_,_]).sum([0,1]) * kappa ).sum([0,1])
+    return 0.5 * self.c0 * ( (self.constit * epsilon[:,:,_,_]).sum([0,1]) * epsilon ).sum([0,1]) \
+         + 0.5 * self.c1 * ( (self.constit * kappa[:,:,_,_]).sum([0,1]) * kappa ).sum([0,1])
 
   def energy_classic( self, x ):
     X = self.X
@@ -112,8 +113,8 @@ class KLshell:
     kappa = (hess * norm[:,_,_]).sum( 0 ) - \
             (Hess * Norm[:,_,_]).sum( 0 )
 
-    return self.c0 * ( (self.constit * epsilon[:,:,_,_]).sum([0,1]) * epsilon ).sum([0,1]) \
-         + self.c1 * ( (self.constit * kappa[:,:,_,_]).sum([0,1]) * kappa ).sum([0,1])
+    return 0.5 * self.c0 * ( (self.constit * epsilon[:,:,_,_]).sum([0,1]) * epsilon ).sum([0,1]) \
+         + 0.5 * self.c1 * ( (self.constit * kappa[:,:,_,_]).sum([0,1]) * kappa ).sum([0,1])
 
   def energy_parfree( self, x ):
     X = self.X
@@ -127,14 +128,8 @@ class KLshell:
     epsilon = 0.5*(Proj - grad[:,:,_] * grad[:,_,:]).sum(0)
     kappa = (hess * norm[:,_,_]).sum(0) - (Projgrad * Norm[:,_,_]).sum(0)
 
-    return self.c0 * ( (self.constit * epsilon[:,:,_,_]).sum([0,1]) * epsilon ).sum([0,1]) \
-         + self.c1 * ( (self.constit * kappa[:,:,_,_]).sum([0,1]) * kappa ).sum([0,1])
-
-  def energy( self, x ):
-    func = self.energy_local if self.form=='local' else \
-           self.energy_classic if self.form=='classic' else \
-           self.energy_parfree
-    return func( x )
+    return 0.5 * self.c0 * ( (self.constit * epsilon[:,:,_,_]).sum([0,1]) * epsilon ).sum([0,1]) \
+         + 0.5 * self.c1 * ( (self.constit * kappa[:,:,_,_]).sum([0,1]) * kappa ).sum([0,1])
 
   def stiffness_local( self, x ):
     'Variations of internal energy in local form.'
@@ -242,20 +237,20 @@ class KLshell:
     w = self.disp
 
     # precompuations
-    grad = x.grad( X, ndims=-1 )
-    hess = grad.grad( X, ndims=-1 )
-    norm = x.normal( ndims=2 )
-    Norm = X.normal( ndims=2 )
+    grad = x.grad( X, 2 )
+    hess = grad.grad( X, 2 )
+    norm = x.normal( 2 )
+    Norm = X.normal( 2 )
     Proj = function.eye( 3 ) - Norm[:,_]*Norm[_,:] # Projection onto tangent plane
-    Projgrad = Proj.grad( X, ndims=-1 ) # Contains dNorm
-    wgrad = w.grad( X, ndims=-1 )
-    whess = wgrad.grad( X, ndims=-1 )
+    Projgrad = Proj.grad( X, 2 )
+    wgrad = w.grad( X, 2 )
+    whess = wgrad.grad( X, 2 )
 
     # strain and variations
-    epsilon = 0.5*(Proj - grad[:,:,_] * grad[:,_,:]).sum(0)
-    depsilon = (wgrad[:,:,:,_] * grad[_,:,_,:] ).sum(1)
-    depsilon = 0.5 * (depsilon + depsilon.swapaxes( 1, 2 ))
-    d2epsilon = (wgrad[:,_,:,:,_] * wgrad[_,:,:,_,:]).sum(2)
+    epsilon = 0.5*(Proj - (grad[:,:,_] * grad[:,_,:]).sum(0))
+    depsilon = (wgrad[:,:,:,_] * grad[_,:,_,:]).sum(1)
+    depsilon = -0.5 * (depsilon + depsilon.swapaxes(1,2))
+    d2epsilon = -(wgrad[:,_,:,:,_] * wgrad[_,:,:,_,:]).sum(2)
 
     # precompuations
     def zfunc( df, dg ):
@@ -266,15 +261,14 @@ class KLshell:
       return (levicivita[...,:,:,:]*temp[...,_,:,:]).sum([-1,-2])
     dz = zfunc( grad, wgrad )
     d2z = zfunc( wgrad[:,_], wgrad[_,:] )
-    dnorm = dz - norm[_,:]*(norm*dz).sum(-1)[:,_]
-    temp = (norm*dz[:,_]).sum(-1)[:,:,_]*dnorm[_,:,:]
-    d2norm = d2z \
-           - norm[_,_,:]*(norm*d2z).sum(-1)[:,:,_] \
-           - (dnorm[:,_]*dnorm[_,:]).sum(-1)[:,:,_]*norm[_,_,:] \
+    dnorm = dz - norm[_,:]*(norm[_,:]*dz).sum(1)[:,_]
+    temp = (norm[_,:]*dz[:,:]).sum(1)[:,_,_]*dnorm[_,:,:]
+    d2norm = d2z - norm[_,_,:]*(norm[_,_,:]*d2z).sum(2)[:,:,_] \
+           - (dnorm[:,_,:]*dnorm[_,:,:]).sum(-1)[:,:,_]*norm[_,_,:] \
            - temp - temp.swapaxes( 0, 1 )
 
     # curvature and variations
-    kappa = (hess * norm[:,_,_]).sum(0) - (Projgrad * Norm[:,_,_]).sum(0)
+    kappa = (hess[:,:,:] * norm[:,_,_]).sum(0) - (Projgrad * Norm[:,_,_]).sum(0)
     dkappa = (whess[:,:,:,:] * norm[_,:,_,_]).sum(1) \
            + (hess[_,:,:,:] * dnorm[:,:,_,_]).sum(1)
     d2kappa = (whess[:,_,:,:,:] * dnorm[_,:,:,_,_]).sum(2) \
@@ -290,12 +284,6 @@ class KLshell:
         + 2. * self.c1 * ( (self.constit * kappa[_,_,:,:,_,_]).sum([2,3]) * d2kappa ).sum([2,3])
 
     return res, jac
-
-  def stiffness( self, x ):
-    func = self.stiffness_local if self.form=='local' else \
-           self.stiffness_classic if self.form=='classic' else \
-           self.stiffness_parfree
-    return func( x )
 
   def inertia( self, x0, x1, x2, tau ):
     'Inertia term given previous levels x0, x1 and current level x2 (Implicit Euler).'
@@ -324,6 +312,7 @@ class KLshell:
     TOL,       linear solve tolerance (0 = direct),
     phys,      physics dictionary: phys['load']=load,
                                    phys['inertia']=(x0, x1, tau)'''
+    t0 = time.time()
     log.context( 'kl' )
     # TODO: check for invalid keys in phys... .pop()?
     x = x0 if x0 else self.X
@@ -339,121 +328,116 @@ class KLshell:
         temp = self.inertia( x0, x1, x, tau )
         res += temp[0]
         jac += temp[1]
-      vec, mat = self.assemble( [res, jac], force_dense=not bool(TOL), title='assemble[%i]'%self.disp.shape[0] )
+      log.info( 'func obj compiled in %.1f seconds' % (time.time()-t0) )
+      t0 = time.time()
+      vec, mat = self.assemble( [res, jac], title='assemble[%i]'%self.disp.shape[0] )
 
       # Print and yield
       err = numpy.linalg.norm( constrain | vec )
-      if locals().has_key('t0'): elapsed( t0 )
+      log.info( 'assembled in %.1f seconds' % (time.time()-t0) )
       yield x, err, upd
 
       # Solve
-      t0 = time.time()
       upd = mat.solve( vec, constrain=constrain, tol=TOL, precon='spilu' )
-      elapsed( t0 )
 
       # New iterate
       t0 = time.time()
       x -= relax*self.disp.dot( constrain | upd )
 
-def elapsed( t0 ):
-  dt = time.time() - t0
-  hours   = int( dt // 3600 )
-  minutes = int( dt // 60 - 60 * hours )
-  seconds = int( dt // 1 - 60 * minutes - 3600 * hours )
-  log.info( 'elapsed %d:%02d:%02d'%(hours, minutes, seconds) )
-
-def slroof( verify=True, nelems=16, jmax=2**4, form='parfree', transform=False ):
-  '''Scordelis-Lo roof benchmark
-  I: verify,    perform some verification tests,
-     nelems,    element count in 1 direction,
-     jmax,      max # nonlinear iterations,
-     form,      formulation: 'classic' or 'parfree',
-     transform, if 'classic' skew parametrization,
-  O: None.'''
-  xmidref = numpy.array( [1.6069807987149836e+01, -3.3306690738754696e-16, -5.8489885841615301e+00] )
-
-  # Discretization
-  grid = numpy.linspace( -.5, .5, nelems+1 )
-  domain, coords = mesh.rectilinear( 2*(grid,) )
-  disp = domain.splinefunc( degree=2*(3,) ).vector( 3 )
-  assert not numpy.mod( nelems, 2 ), 'need even nelems, got %i'%nelems
-  midpoint = domain[nelems/2:,nelems/2:].boundary['bottom'].boundary['right']
-  midpointdisp = lambda func: midpoint.integrate( func, coords=X, ischeme='none' )
+def scordelislo( domain, coords, case='lo' ):
+  '''Scordelis-Lo roof benchmark,
+  I: domain,  StructuredTopology instance,
+     coords,  parametric coordinate function,
+     case,    formulation in ('lo', 'tr', 'pf'),
+  O: x,       displaced position,
+     d,       midpoint displacement,
+     W,       total internal energy.'''
+  log.context( 'scordelis-lo' )
 
   # Geometry
   xi, eta = coords
-  length=50; radius=25; angle=40
+  length, radius, angle = 50, 25, 40
   phi = angle * xi * numpy.pi / 90.
-  slroof = function.stack( [ radius * function.sin(phi), length * eta, radius * (function.cos(phi)-1) ] )
-  if transform: coords = function.stack( (xi, .5*function.sin( numpy.pi*eta )) )
-  X = slroof # domain.projection( slroof, onto=disp, coords=coords, ischeme='gauss3' ) # This projection is not strictly necessary, but makes 'parfree' code run much faster.
+  x0 = function.stack( [radius * function.sin(phi), length * eta, radius * (function.cos(phi)-1)] )
+
+  # Basis
+  nelems, temp = domain.structure.shape # Assume bivariate StructuredTopology
+  assert nelems == temp, 'Assumes equal element count in both directions.'
+  assert not numpy.mod( nelems, 2 ), 'need even nelems, got %i'%nelems
+  disp = domain.splinefunc( degree=2 ).vector(3)
+  midpoint = domain[nelems/2:,nelems/2:].boundary['bottom'].boundary['right']
+  midpointdisp = lambda func: midpoint.integrate( func, coords=coords, ischeme='none', title='midpointdisp' )
+  ischeme = 'gauss%i'%7 # {'pf':4, 'tr':3, 'lo':2}[case] # TODO: choose optimal orders
 
   # Physics
   clamps = domain.boundary['top'] + domain.boundary['bottom'] 
-  cons = clamps.project( 0., onto=disp[:,0], coords=coords, title='proj[bcs x]' ) \
-       | clamps.project( 0., onto=disp[:,2], coords=coords, title='proj[bcs z]' )
-  params = {'E':1., 'nu':0., 'h':.25, 'ischeme':'gauss7'}
-  phys = {'load':[0.,0.,5.e-6/3.]}
-  # params = {'E':4.32e8, 'nu':0., 'h':.25, 'ischeme':'gauss7'}
-  # phys = {'load':[0.,0.,90.]}
-  roof = KLshell( domain, disp, X, params, form=form, theta=coords )
-
-  # Pre processing
-  if verify:
-    TOL = 1.e-2 if nelems==2 else 1.e-5
-    assert numpy.linalg.norm( midpointdisp( X ) - xmidref )/numpy.linalg.norm( xmidref ) < TOL, 'midpoint verification failed'
+  cons = clamps.project( 0., onto=disp[:,0], coords=coords, ischeme=ischeme, title='proj[bcs x]' ) \
+       | clamps.project( 0., onto=disp[:,2], coords=coords, ischeme=ischeme, title='proj[bcs z]' )
+  params = {'E':4.32e8, 'nu':0., 'h':.25, 'ischeme':ischeme} # dimensionless: {'E':1., 'nu':0., 'h':.25, 'ischeme':ischeme}
+  phys = {'load':[0.,0.,-90.]} #                                              {'load':[0.,0.,-5.e-6/3.]}
+  roof = KLshell( domain, disp, x0, params,
+                  form={'pf':'parfree', 'tr':'classic', 'lo':'local'}[case],
+                  theta=function.stack( [xi, .5*function.sin(numpy.pi*eta)] ) if case=='tr' else None )
 
   # Solve
-  TOL = 1e-5 # doesn't converge if set lower!
-  j, errs = 0, []
-  for x, err, upd in roof.solve( constrain=cons, phys=phys, TOL=TOL ):
-    errs.append( err )
-    d = midpointdisp(x-X)[2]
-    log.info( 'j:{0:d}, d(.5):{1:6f}, err:{2:1e}'.format( j, d, err ) )
-    # plot.writevtu( './slroof{0:02d}.vtu'.format( j ), domain.refine( 3 ), x )
-    if (verify and j==1 ) or (err<TOL or j>jmax):
-      xdofs = domain.project( x, onto=disp, coords=X, ischeme=roof.params['ischeme'] )
-      pickle.dump( {'xdofs':xdofs, 'd':d},
-                   open( 'slroof-%sT%s-ne%i.pck' % (form, transform, nelems) ) )
-      break
-    j += 1
+  for x, err, upd in roof.solve( constrain=cons, phys=phys, TOL=1.e-7 ):
+    j = 0 if not locals().has_key('j') else j+1
+    d = midpointdisp(x-x0)[2]
+    W = float( roof.assemble( roof.energy( x ), title='W' ) )
+    log.info( '#el/j:%i/%i, d(.5):%.6f, W:%.4e' % (nelems, j, d, W) )
+    if j: return x, d, W
 
-    # Finite difference approximation
-    if verify and False:
-      'Preparatory calculations'
-      dofs = domain.project( x, onto=disp, coords=X ) | 0.
-      dres = domain.integrate( 
-             roof.stiffness( x )[1],
-             iweights=function.IWeights(), ischeme='gauss8', title='jacobian' )
-      resf = lambda xlin: roof.stiffness( xlin )[0]
-      title = 'fd jac %% 3i/% 3i'%len( dofs )
+def conv( case='lo', levels=3, test=scordelislo ):
+  'Convergence test for KL shell with b-splines.'
+  # Coarse grid, reference geometry
+  domain0, coords = mesh.rectilinear( 2*(numpy.linspace(-.5,.5,3),) )
 
-      'Do FD approx for series of deltas'
-      deltarange = 10.**-numpy.arange( 3, 7 )
-      diffnorm = []
-      for delta in deltarange:
-        dres_fd = fdapprox( resf, disp, dofs, delta=delta )
-        temp = numpy.array( [domain.integrate( fi, iweights=function.IWeights(), ischeme='gauss8', title=title%i ) for i, fi in enumerate( dres_fd )] )
-        diff = dres.toarray() - temp
-        diffnorm.append( numpy.linalg.norm( diff ) )
-        with plot.PyPlot( 'rel_err_jac' ) as fig:
-          fig.cspy( diff/temp )
-      with plot.PyPlot( 'fd-conv' ) as fig:
-        fig.xlabel( r'$\delta$' )
-        fig.ylabel( r'$\| \partial K - \partial K_\delta \|_\mathrm{HS}$' )
-        fig.title( 'Finite difference convergence stiffness $\partial K$' )
-        fig.loglog( deltarange, diffnorm, 'k.-' )
-        fig.slope_triangle( deltarange, diffnorm )
-        fig.grid( True )
-      log.debug( 'Finished FD convergence of stiffness' )
+  # Compute errors
+  errh2, d, W = [], [], []
+  nrange = numpy.arange( levels, -1, -1 )
+  for n in nrange:
+    if n == levels: # Reference configuration
+      domain = domain0.refine(n)
+      xref, dref, Wref = test( domain, coords, case=case )
+      h2norm = lambda x: numpy.sqrt( domain.integrate(
+               (x**2).sum(0) +
+               (x.grad(coords)**2).sum([0,1]) +
+               (x.grad(coords).grad(coords)**2).sum([0,1,2]),
+               coords=coords, ischeme='gauss7', title='h2norm' ) )
+    else:
+      xi, di, Wi = test( domain0.refine(n), coords, case=case )
+      errh2.append( h2norm( xi-xref ) )
+      d.append( di )
+      W.append( Wi )
 
-  # Post processing
-  if verify:
-    zdisp = 0.025734 if nelems==2 else 0.29615383 # use literature value unless lowest resolution
-    assert numpy.abs( zdisp + midpointdisp( x-X )[2] ) < 1.e-4, 'scordelis-lo roof benchmark failed'
-    log.debug( 'scordelis-lo roof benchmark passed' )
+  # Plot
+  x = 50 * 2.**-nrange[:-1] # h, based on scordelis-lo benchmark
+  def convplot( y, title ):
+   with plot.PyPlot( 'conv' ) as fig:
+     fig.loglog( x, y, 'k.-' )
+     slope = fig.slope_triangle( x[:2], y[:2] )
+     fig.xlabel( '$h$' )
+     fig.title( title + ' (case:%s, d:%.6f)'%(case, dref) )
+   return slope
+  slope_d = convplot( numpy.abs(numpy.asarray(d)/dref-1.), 'rel. err. midpoint displ.' )
+  slope_W = convplot( numpy.abs(numpy.asarray(W)/Wref-1.), 'rel. err. potential energy' )
+  slope_n = convplot( errh2/h2norm(xref), 'rel. err. in $H^2$-norm' )
+
+  # Verify results
+  if levels > 4 and test is scordelislo:
+    assert slope_d > 3.7 and slope_W > 3.7 and slope_n > 1.1, 'Convergence rate insufficient.'
+    numpy.testing.assert_almost_equal( dref, -0.3005511, decimal=4,
+        err_msg='Midpoint displacement (=%.4f) incorrect.'%dref )
+  else:
+    log.info( 'No code verification performed.' )
+
+def verify( case='lo' ):
+  'Quick code verification.'
+  domain, coords = mesh.rectilinear( 2*(numpy.linspace(-.5,.5,9),) )
+  dref = scordelislo( domain, coords, case=case )[1]
+  numpy.testing.assert_almost_equal( dref, -0.242468, decimal=4,
+        err_msg='Midpoint displacement (=%.4f) incorrect.'%dref )
 
 if __name__ == '__main__':
-  util.run( slroof )
-
+  util.run( verify, conv )
 # vim:shiftwidth=2:foldmethod=indent:foldnestmax=2
