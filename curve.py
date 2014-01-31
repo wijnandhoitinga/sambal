@@ -231,88 +231,113 @@ class PathLength( function.ArrayFunc ):
 
 class Font( object ):
   def __init__( self ):
-    self.scale=1.
+    
+    self.A = Curve( orig=[0,0], angle=numpy.arctan(2) )
+    self.A.grow( length=numpy.sqrt(1.25) )
+    self.A.move( angle=-2*numpy.arctan(2) )
+    self.A.grow( length=numpy.sqrt(1.25) )
+    self.A.move( absolute=[0.23,0.4], absangle=0 )
+    self.A.grow( length=0.53)
+
+    self.A.move( absolute=[1.2,0.0], absangle=0 )
+
     self.C = Curve( orig=0.5+numpy.array([0.25*numpy.sqrt(2),0.25*numpy.sqrt(2)]), angle=3*pi/4 )
-    self.C.grow( angle=3*pi/2, curvature=-2/self.scale )
+    self.C.grow( angle=3*pi/2, curvature=-2. )
     self.C.move( absolute=[1.2,0.0], absangle=0 )
     
     self.E = Curve( orig=[1.0,0], angle=-pi )
-    self.E.grow( length=self.scale )
-    self.E.grow( angle=pi/2, curvature=1000/self.scale )
-    self.E.grow( length=self.scale )
-    self.E.grow( angle=pi/2, curvature=1000/self.scale )
-    self.E.grow( length=self.scale )
-    self.E.move( absolute=[0,0.5*self.scale] )
-    self.E.grow( length=0.5*self.scale )
+    self.E.grow( length=1.0 )
+    self.E.grow( angle=pi/2, curvature=1000 )
+    self.E.grow( length=1.0 )
+    self.E.grow( angle=pi/2, curvature=1000 )
+    self.E.grow( length=1.0 )
+    self.E.move( absolute=[0,0.5] )
+    self.E.grow( length=0.5 )
     self.E.move( absolute=[1.2,0.0], absangle=0 )
 
     self.G = Curve( orig=0.5+numpy.array([0.25*numpy.sqrt(2),0.25*numpy.sqrt(2)]), angle=3*pi/4 )
-    self.G.grow( angle=7*pi/4, curvature=-2/self.scale )
-    self.G.move( absolute=[0.5*self.scale,0.5*self.scale], absangle=0 )
-    self.G.grow( length=0.5*self.scale )
+    self.G.grow( angle=7*pi/4, curvature=-2. )
+    self.G.move( absolute=[0.5,0.5], absangle=0 )
+    self.G.grow( length=0.5 )
     self.G.move( absolute=[1.2,0.0], absangle=0 )
 
     self.H = Curve( orig=[0,0], angle=pi/2 )
-    self.H.grow( length=self.scale )
-    self.H.move( length=-0.5*self.scale, absangle=0 )
-    self.H.grow( length=self.scale )
-    self.H.move( absolute=[self.scale,0], absangle=pi/2 )
-    self.H.grow( length=self.scale )
+    self.H.grow( length=1.0 )
+    self.H.move( length=-0.5, absangle=0 )
+    self.H.grow( length=1.0 )
+    self.H.move( absolute=[1.0,0.0], absangle=pi/2 )
+    self.H.grow( length=1.0 )
     self.H.move( absolute=[1.2,0.0], absangle=0 )
  
     self.I = Curve( orig=[0.1,0], angle=pi/2 )
-    self.I.grow( length=self.scale )
+    self.I.grow( length=1.0 )
     self.I.move( absolute=[0.5,0], absangle=0 )
 
+    self.L = Curve( orig=[0.0,1.0], angle=-pi/2 )
+    self.L.grow( length=1.0 )
+    self.L.move( absangle=0 )
+    self.L.grow( length=1.0 )
+    self.L.move( absolute=[1.2,0], absangle=0 )
+
+    self.M = Curve( orig=[0.0,0.0], angle=pi/2 )
+    self.M.grow( length=1.0 )
+    self.M.move( angle=-pi/2 )
+    self.M.grow( length=1.0 )
+    self.M.move( angle=-pi/2 )
+    self.M.grow( length=1.0 )
+    self.M.move( absolute=[0.5,1.0], absangle=-pi/2 )
+    self.M.grow( length=0.5 )
+    self.M.move( absolute=[1.2,0.0], absangle=0 )
+
     self.N = Curve( orig=[0,0], angle=pi/2 )
-    self.N.grow( length=self.scale )
-    self.N.grow( angle=3*pi/4, curvature=1000/self.scale )
-    self.N.grow( length=numpy.sqrt( 2*self.scale**2 ) )
-    self.N.grow( angle=3*pi/4, curvature=-1000/self.scale )
-    self.N.grow( length=self.scale )
+    self.N.grow( length=1.0 )
+    self.N.grow( angle=3*pi/4, curvature=1000 )
+    self.N.grow( length=numpy.sqrt( 2 ) )
+    self.N.grow( angle=3*pi/4, curvature=-1000 )
+    self.N.grow( length=1.0 )
     self.N.move( absolute=[1.2,0.0], absangle=0 )
 
-    self.O = Curve( orig=[0.5*self.scale, 0], angle=0 )
-    self.O.grow( angle=2*pi, curvature=-2/self.scale )
+    self.O = Curve( orig=[0.5, 0], angle=0 )
+    self.O.grow( angle=2*pi, curvature=-2.0 )
     self.O.move( absolute=[1.2,0.0], absangle=0 )
 
     self.R = Curve( orig=[0,0], angle=pi/2 )
-    self.R.grow( length=self.scale )
-    self.R.grow( angle=pi/2, curvature=1e3/self.scale )
-    self.R.grow( length=0.75*self.scale )
-    self.R.grow( angle=pi, curvature=4/self.scale )
-    self.R.grow( length=0.75*self.scale )
-    self.R.move( absolute=[0.75*self.scale,0.5*self.scale], absangle=0 )
-    self.R.grow( angle=pi/2, curvature=4/self.scale )
-    self.R.grow( length= 0.25*self.scale )
+    self.R.grow( length=1.0 )
+    self.R.grow( angle=pi/2, curvature=1e3 )
+    self.R.grow( length=0.75 )
+    self.R.grow( angle=pi, curvature=4 )
+    self.R.grow( length=0.75 )
+    self.R.move( absolute=[0.75,0.5], absangle=0 )
+    self.R.grow( angle=pi/2, curvature=4 )
+    self.R.grow( length= 0.25 )
     self.R.move( absolute=[1.2,0.0], absangle=0 )
 
     self.S = Curve( orig=[1.0,1.0], angle=-pi )
-    self.S.grow( length=0.75*self.scale )
-    self.S.grow( angle=pi, curvature=-4/self.scale )
-    self.S.grow( length=0.5*self.scale )
-    self.S.grow( angle=pi, curvature=4/self.scale )
-    self.S.grow( length=0.75*self.scale )
+    self.S.grow( length=0.75 )
+    self.S.grow( angle=pi, curvature=-4.0 )
+    self.S.grow( length=0.5 )
+    self.S.grow( angle=pi, curvature=4.0 )
+    self.S.grow( length=0.75 )
     self.S.move( absolute=[1.2,0.0], absangle=0 )
 
     self.T = Curve( orig=[0.5,0], angle=pi/2 )
-    self.T.grow( length=self.scale )
-    self.T.move( absolute=[0,self.scale], absangle=0 )
-    self.T.grow( length=self.scale )
+    self.T.grow( length=1.0 )
+    self.T.move( absolute=[0.0,1.0], absangle=0 )
+    self.T.grow( length=1.0 )
     self.T.move( absolute=[1.2,0.0], absangle=0 )
 
     self.U = Curve( orig=[0.0,1.0], angle=-pi/2 )
-    self.U.grow( length=0.5*self.scale )
-    self.U.grow( angle=pi, curvature=-2/self.scale )
-    self.U.grow( length=0.5*self.scale )
+    self.U.grow( length=0.5 )
+    self.U.grow( angle=pi, curvature=-2.0 )
+    self.U.grow( length=0.5 )
     self.U.move( absolute=[1.2,0.0], absangle=0 )
 
     self.Z = Curve( orig=[0.0,1.0], angle=0 )
-    self.Z.grow( length=self.scale )
-    self.Z.grow( angle=3.*pi/4., curvature=1000/self.scale )
-    self.Z.grow( length=numpy.sqrt( 2*self.scale**2 ) )
-    self.Z.grow( angle=3.*pi/4., curvature=-1000/self.scale )
-    self.Z.grow( length=self.scale )
+    self.Z.grow( length=1.0 )
+    self.Z.grow( angle=3.*pi/4., curvature=1000 )
+    self.Z.grow( length=numpy.sqrt( 2 ) )
+    self.Z.grow( angle=3.*pi/4., curvature=-1000 )
+    self.Z.grow( length=1.0 )
     self.Z.move( absolute=[1.2,0.0], absangle=0 )
      
 
@@ -324,150 +349,3 @@ class Font( object ):
 
     return text
        
-    
-
-class Text( object ):
-
-  def __init__( self, cursor, spacing, scale ):
-    self.cursor = numpy.array( cursor )
-    self.spacing = spacing
-    self.scale = scale
-    self.curve = Curve( orig=self.cursor, angle=0 )
-
-  def addline( self, text, cursor=None, spacing=None  ):
-    cursor = self.cursor if cursor is None else cursor
-    spacing = self.spacing if spacing is None else spacing
-
-    for letter in text:
-      if letter in ['C', 'c']:
-        self.setC()
-      if letter in ['E', 'e']:
-        self.setE()
-      if letter in ['G', 'g']:
-        self.setG()
-      if letter in ['H','h']:
-        self.setH()
-      if letter in ['I', 'i']:
-        self.setI()
-      if letter in ['N', 'n']:
-        self.setN()
-      if letter in ['O', 'o']:
-        self.setO()
-      if letter in ['R', 'r']:
-        self.setR()
-      if letter in ['S', 's']:
-        self.setS()
-      if letter in ['T', 't']:
-        self.setT()
-      if letter in ['U', 'u']:
-        self.setU()
-      if letter in ['Z', 'z']:
-        self.setZ()
-
-  def setC( self ):
-    self.curve.move( absolute=self.cursor+self.scale*(0.5+numpy.array([0.25*numpy.sqrt(2),0.25*numpy.sqrt(2)])), absangle=3*pi/4 )
-    self.curve.grow( angle=3*pi/2, curvature=-2/self.scale )
-    self.curve.move( absolute=self.cursor+[self.scale+self.spacing,0], absangle=0 )
-    self.cursor = self.curve.current
-
-  def setE( self ):
-    self.curve.move( length=self.scale, absangle=-pi )
-    self.curve.grow( length=self.scale )
-    self.curve.grow( angle=pi/2, curvature=1000/self.scale )
-    self.curve.grow( length=self.scale )
-    self.curve.grow( angle=pi/2, curvature=1000/self.scale )
-    self.curve.grow( length=self.scale )
-    self.curve.move( absolute=self.cursor+[0,0.5*self.scale] )
-    self.curve.grow( length=0.5*self.scale )
-    self.curve.move( absolute=self.cursor+[self.scale+self.spacing, 0] )
-    self.cursor = self.curve.current
-
-  def setG( self ):
-    self.curve.move( absolute=self.cursor+self.scale*(0.5+numpy.array([0.25*numpy.sqrt(2),0.25*numpy.sqrt(2)])), absangle=3*pi/4 )
-    self.curve.grow( angle=7*pi/4, curvature=-2/self.scale )
-    self.curve.move( absolute=self.cursor+[0.5*self.scale,0.5*self.scale], absangle=0 )
-    self.curve.grow( length=0.5*self.scale )
-    self.curve.move( absolute=self.cursor+[self.scale+self.spacing,0], absangle=0 )
-    self.cursor = self.curve.current
-
-  def setH( self ):
-    self.curve.move( angle=pi/2 )
-    self.curve.grow( length=self.scale )
-    self.curve.move( length=-0.5*self.scale, absangle=0 )
-    self.curve.grow( length=self.scale )
-    self.curve.move( absolute=[self.cursor[0]+self.scale,self.cursor[1]], absangle=pi/2 )
-    self.curve.grow( length=self.scale )
-    self.curve.move( absolute=self.cursor+numpy.array([self.scale+self.spacing, 0] ), absangle=0 ) 
-    self.cursor = self.curve.current
-  
-  def setI( self ):
-    self.curve.move( absolute=self.cursor+[0.25*self.scale,0], absangle=pi/2 )
-    self.curve.grow( length=self.scale )
-    self.curve.move( absolute=self.cursor+[0.5*self.scale+self.spacing,0], absangle=0 )
-    self.cursor = self.curve.current
-
-  def setN( self ):
-    self.curve.move( angle=pi/2 )
-    self.curve.grow( length=self.scale )
-    self.curve.grow( angle=3*pi/4, curvature=1000/self.scale )
-    self.curve.grow( length=numpy.sqrt( 2*self.scale**2 ) )
-    self.curve.grow( angle=3*pi/4, curvature=-1000/self.scale )
-    self.curve.grow( length=self.scale )
-    self.curve.move( absolute=self.cursor+numpy.array( [self.scale+self.spacing, 0 ] ), absangle=0 )
-    self.cursor = self.curve.current
-
-  def setO( self ):
-    self.curve.move( absolute=self.cursor+[0.5*self.scale, 0] )
-    self.curve.grow( angle=2*pi, curvature=-2/self.scale )
-    self.curve.move( absolute=self.cursor+[self.scale+self.spacing,0] )
-    self.cursor = self.curve.current
-
-  def setR( self ):
-    self.curve.move( absangle=pi/2 )
-    self.curve.grow( length=self.scale )
-    self.curve.grow( angle=pi/2, curvature=1e3/self.scale )
-    self.curve.grow( length=0.75*self.scale )
-    self.curve.grow( angle=pi, curvature=4/self.scale )
-    self.curve.grow( length=0.75*self.scale )
-    self.curve.move( absolute=self.cursor+[0.75*self.scale,0.5*self.scale], absangle=0 )
-    self.curve.grow( angle=pi/2, curvature=4/self.scale )
-    self.curve.grow( length= 0.25*self.scale )
-    self.curve.move( absolute=self.cursor+[self.scale+self.spacing, 0], absangle=0 )
-    self.cursor = self.curve.current
-
-  def setS( self ):
-    self.curve.move( absolute=self.cursor+[self.scale,self.scale], absangle=-pi )
-    self.curve.grow( length=0.75*self.scale )
-    self.curve.grow( angle=pi, curvature=-4/self.scale )
-    self.curve.grow( length=0.5*self.scale )
-    self.curve.grow( angle=pi, curvature=4/self.scale )
-    self.curve.grow( length=0.75*self.scale )
-    self.curve.move( absolute=self.cursor+[self.scale+self.spacing, 0], absangle=0 )
-    self.cursor = self.curve.current
-    
-  def setT( self ):
-    self.curve.move( length=0.5*self.scale, absangle=pi/2 )
-    self.curve.grow( length=self.scale )
-    self.curve.move( absolute=self.cursor+[0,self.scale], absangle=0 )
-    self.curve.grow( length=self.scale )
-    self.curve.move( absolute=self.cursor+[self.scale+self.spacing,0] )
-    self.cursor = self.curve.current
-
-  def setU( self ):
-    self.curve.move( absolute=self.cursor+[0,self.scale], absangle=-pi/2 )
-    self.curve.grow( length=0.5*self.scale )
-    self.curve.grow( angle=pi, curvature=-2/self.scale )
-    self.curve.grow( length=0.5*self.scale )
-    self.curve.move( absolute=self.cursor+[self.scale+self.spacing,0], absangle=0 )
-    self.cursor = self.curve.current
-
-  def setZ( self ):
-     self.curve.move( absolute=self.cursor + numpy.array( [0,self.scale] ) )
-     self.curve.grow( length=self.scale )
-     self.curve.grow( angle=3.*pi/4., curvature=1000/self.scale )
-     self.curve.grow( length=numpy.sqrt( 2*self.scale**2 ) )
-     self.curve.grow( angle=3.*pi/4., curvature=-1000/self.scale )
-     self.curve.grow( length=self.scale )
-     self.curve.move( length=self.spacing )
-     self.cursor = self.curve.current
-     
