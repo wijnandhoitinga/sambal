@@ -244,16 +244,26 @@ class Font( object ):
     self.C = Curve( orig=0.5+numpy.array([0.25*numpy.sqrt(2),0.25*numpy.sqrt(2)]), angle=3*pi/4 )
     self.C.grow( angle=3*pi/2, curvature=-2. )
     self.C.move( absolute=[1.2,0.0], absangle=0 )
+
+    self.D = Curve( orig=[0.0,0.0], angle=pi/2 )
+    self.D.grow( length=1.0 )
+    self.D.move( angle=-pi/2 )
+    self.D.grow( length=0.5 )
+    self.D.grow( angle=pi/2, curvature=4. )
+    self.D.grow( length=0.5 )
+    self.D.grow( angle=pi/2, curvature=4. )
+    self.D.grow( length=0.5 )
+    self.D.move( absolute=[1.2,0.0], absangle=0 )
     
-    self.E = Curve( orig=[1.0,0], angle=-pi )
-    self.E.grow( length=1.0 )
+    self.E = Curve( orig=[0.8,0.0], angle=-pi )
+    self.E.grow( length=0.8 )
     self.E.grow( angle=pi/2, curvature=1000 )
     self.E.grow( length=1.0 )
     self.E.grow( angle=pi/2, curvature=1000 )
-    self.E.grow( length=1.0 )
+    self.E.grow( length=0.8 )
     self.E.move( absolute=[0,0.5] )
     self.E.grow( length=0.5 )
-    self.E.move( absolute=[1.2,0.0], absangle=0 )
+    self.E.move( absolute=[1.0,0.0], absangle=0 )
 
     self.G = Curve( orig=0.5+numpy.array([0.25*numpy.sqrt(2),0.25*numpy.sqrt(2)]), angle=3*pi/4 )
     self.G.grow( angle=7*pi/4, curvature=-2. )
@@ -341,11 +351,24 @@ class Font( object ):
     self.Z.move( absolute=[1.2,0.0], absangle=0 )
      
 
-  def text( self, letters, spacing=0.0, fontsize=1.0 ):
+  def text( self, letters, spacing=0.0, fontsize=1.0, orig=None ):
     text = Curve() 
+    if orig is not None:
+      text.move( absolute=orig )
     for iletter, letter in enumerate( letters ):
       text += getattr( self, letter.upper() ).scale( factor=fontsize )
       text.move( length=spacing )
 
+    self.line = text
     return text
-       
+  def addtext( self, letters, spacing=0.0, fontsize=1.0, orig=None ):
+    text=self.line
+    if orig is not None:
+      text.move( absolute=orig )
+    for iletter, letter in enumerate( letters ):
+      text += getattr( self, letter.upper() ).scale( factor=fontsize )
+      text.move( length=spacing )
+
+    self.line = text
+    return text
+
