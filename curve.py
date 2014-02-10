@@ -243,7 +243,7 @@ class Font( object ):
 
     self.C = Curve( orig=0.5+numpy.array([0.25*numpy.sqrt(2),0.25*numpy.sqrt(2)]), angle=3*pi/4 )
     self.C.grow( angle=3*pi/2, curvature=-2. )
-    self.C.move( absolute=[1.2,0.0], absangle=0 )
+    self.C.move( absolute=[1.1,0.0], absangle=0 )
 
     self.D = Curve( orig=[0.0,0.0], angle=pi/2 )
     self.D.grow( length=1.0 )
@@ -291,12 +291,12 @@ class Font( object ):
 
     self.M = Curve( orig=[0.0,0.0], angle=pi/2 )
     self.M.grow( length=1.0 )
-    self.M.move( angle=-pi/2 )
+    self.M.move( angle=-2*pi/3 )
+    self.M.grow( length=0.6 )
+    self.M.move( angle=pi/3 )
+    self.M.grow( length=0.6 )
+    self.M.move( angle=-2*pi/3 )
     self.M.grow( length=1.0 )
-    self.M.move( angle=-pi/2 )
-    self.M.grow( length=1.0 )
-    self.M.move( absolute=[0.5,1.0], absangle=-pi/2 )
-    self.M.grow( length=0.5 )
     self.M.move( absolute=[1.2,0.0], absangle=0 )
 
     self.N = Curve( orig=[0,0], angle=pi/2 )
