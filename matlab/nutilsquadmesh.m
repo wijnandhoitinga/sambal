@@ -20,7 +20,7 @@
 % >>> x = points(:,1), y = points(:,2);
 % >>> nutilsquadmesh( x, y, colors );
 function fig = nutilsquadmesh( x, y, val )
-	if length(x) ~= length(y) || length(x) ~= length(val)
+    if length(x) ~= length(y) || length(x) ~= length(val)
         error('The vectors x, y and val should have the same length');
     end
     warning('This script can only be used to plot quad meshes with equal number of data-points per element. Furthermore the number of data-points in x and y direction of the element should match.');
