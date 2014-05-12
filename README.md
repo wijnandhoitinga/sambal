@@ -21,13 +21,18 @@ everywhere.
   $ cd
 ```
 
-Open `.bashrc` (linux) or `.Profile` (mac)
+Open `.bashrc` (linux) or `.Profile` (mac) and type in the following:
 
 ```
   PYTHONPATH="${PYTHONPATH}:$HOME/path/to/nutils"
   PYTHONPATH="${PYTHONPATH}:$HOME/path/to/sambal"
   export PYTHONPATH
+```
 
+After saving the file and __restarting__ the terminal, you can import
+from `sambal`.
+
+```
   from nutils import *          # This does not include sambal
   from sambal import <package>  # Now we can use a sambal package
 ```
