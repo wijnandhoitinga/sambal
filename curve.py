@@ -94,7 +94,7 @@ class Curve( object ):
         dist2s = dist2
         alphas = alpha
       else:
-        smaller = dist2 < dist2s
+        smaller = function.less(dist2, dist2s)
         dist2s[smaller] = dist2[smaller]
         alphas[smaller] = alpha[smaller] + i
     return alphas
@@ -145,7 +145,7 @@ def rotate( x, angle ):
 
 class Line( Segment ):
   def __init__( self, xy0, xy1 ):
-    Segment.__init__( self, xy0, xy1, numeric.norm2(xy0-xy1) )
+    Segment.__init__( self, xy0, xy1, numpy.linalg.norm(xy0-xy1) )
     self.type = 'Line'
 
   def getcoords( self, alpha ):
@@ -157,7 +157,7 @@ class Line( Segment ):
     return .5 - ( R2sqr - R1sqr ) / ( 2 * self.length**2 )
 
   def tangent( self, alpha ):
-    return ( ( self.xy1 - self.xy0 )/ numeric.norm2( self.xy1-self.xy0 ) )[_,:]
+    return ( ( self.xy1 - self.xy0 )/ numpy.linalg.norm( self.xy1-self.xy0 ) )[_,:]
 
  
   def transform( self, shift, angle ):
