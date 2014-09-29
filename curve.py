@@ -211,22 +211,37 @@ class Arc( Segment ):
   def scale( self, factor ):
     return Arc( origin=self.origin*factor, radius=self.radius*factor, phi0=self.phi0, phi1=self.phi1 )
 
+
+
+
 class FindClosest( function.ArrayFunc ):
   def __init__( self, curve, coords ):
-    function.ArrayFunc.__init__( self, evalf=curve.findclosest, args=[coords], shape=() )
+    self.curve = curve
+    function.ArrayFunc.__init__( self, args=[coords], shape=() )
+  def evalf( self, coords ):
+    return self.curve.findclosest(coords)
 
 class PathCoords( function.ArrayFunc ):
   def __init__( self, curve, alpha ):
-    function.ArrayFunc.__init__( self, evalf=curve.getcoords, args=[alpha], shape=(2,) )
+    self.curve = curve
+    function.ArrayFunc.__init__( self, args=[alpha], shape=(2,) )
+  def evalf( self, alpha ):
+    return self.curve.getcoords(alpha)
+
 
 class PathTangent( function.ArrayFunc ):
   def __init__( self, curve, alpha ):
-    function.ArrayFunc.__init__( self, evalf=curve.tangent, args=[alpha], shape=(2,) )
+    self.curve = curve
+    function.ArrayFunc.__init__( self, args=[alpha], shape=(2,) )
+  def evalf( self, alpha ):
+    return self.curve.tangent(alpha)
 
 class PathLength( function.ArrayFunc ):
   def __init__( self, curve, alpha ):
-    function.ArrayFunc.__init__( self, evalf=curve.pathlen, args=[alpha], shape=() )
-
+    self.curve = curve
+    function.ArrayFunc.__init__( self, args=[alpha], shape=() )
+  def evalf( self, alpha ):
+    return self.curve.pathlen(alpha)
 
 
 class Font( object ):
