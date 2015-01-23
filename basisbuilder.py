@@ -1,6 +1,10 @@
 #! /usr/bin/env python
 
 
+from nutils import topology, element, function
+import numpy
+
+
 class BasisBuilder( object ):
 
   def __init__( self, ndims ):
