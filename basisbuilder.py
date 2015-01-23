@@ -25,8 +25,8 @@ class BasisBuilder( object ):
     dofs = numpy.arange( ndofs ).reshape( dofshape )
     idx = numpy.frompyfunc( lambda *s: dofs[s].ravel(), len(slices), 1 )( *numpy.ix_( *slices ) )
     return function.function(
-      fmap = dict( numpy.broadcast( topo.structure, stdelems ) ),
-      nmap = dict( numpy.broadcast( topo.structure, idx ) ),
+      fmap = { elem.transform: ((funcs,None),) for elem, funcs in numpy.broadcast( topo.structure, stdelems ) },
+      nmap = { elem.transform: dofs for elem, dofs in numpy.broadcast( topo.structure, idx ) },
       ndofs = ndofs,
       ndims = topo.ndims )
 
