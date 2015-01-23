@@ -52,7 +52,7 @@ class ProductFunc( BasisBuilder ):
 
   def getstdelems( self, shape ):
     assert len(shape) == self.ndims
-    return self.func1.getstdelems( shape[:self.func1.ndims] )[(Ellipsis,)+(_,)*self.func2.ndims] \
+    return self.func1.getstdelems( shape[:self.func1.ndims] )[(Ellipsis,)+(numpy.newaxis,)*self.func2.ndims] \
          * self.func2.getstdelems( shape[self.func1.ndims:] )
 
 
