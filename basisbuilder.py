@@ -58,24 +58,34 @@ class ProductFunc( BasisBuilder ):
 
 class Spline( BasisBuilder ):
 
-  def __init__( self, degree ):
+  def __init__( self, degree, rmfirst=False, rmlast=False ):
     self.degree = degree
+    self.rmfirst = rmfirst
+    self.rmlast = rmlast
     BasisBuilder.__init__( self, ndims=1 )
 
   def getdofshape( self, (nelems,) ):
-    return nelems + self.degree,
+    return nelems + self.degree - self.rmfirst - self.rmlast,
 
   def getslices( self, (nelems,) ):
-    return [[ slice(i,i+self.degree+1) for i in range(nelems) ]]
+    N, = self.getdofshape( [nelems] )
+    return [[ slice(max(0,i),min(N,i+self.degree+1)) for i in numpy.arange(nelems)-self.rmfirst ]]
 
   def getstdelems( self, (nelems,) ):
-    return element.PolyLine.spline( degree=self.degree, nelems=nelems )
+    stdelems = element.PolyLine.spline( degree=self.degree, nelems=nelems )
+    if self.rmfirst:
+      stdelems[0] = stdelems[0].extract( numpy.eye(stdelems[0].nshapes)[:,1:] )
+    if self.rmlast:
+      stdelems[-1] = stdelems[-1].extract( numpy.eye(stdelems[-1].nshapes)[:,:-1] )
+    return stdelems
     
 
 class ModSpline2( BasisBuilder ):
 
-  def __init__( self, *ifaces ):
-    self.ifaces = ifaces
+  def __init__( self, ifaces, rmfirst=False, rmlast=False ):
+    self.ifaces = tuple(ifaces)
+    self.rmfirst = rmfirst
+    self.rmlast = rmlast
     BasisBuilder.__init__( self, ndims=1 )
 
   def sorted_ifaces( self, nelems ):
@@ -84,13 +94,15 @@ class ModSpline2( BasisBuilder ):
     return ifaces
 
   def getdofshape( self, (nelems,) ):
-    return nelems + 2,
+    return nelems + 2 - self.rmfirst - self.rmlast,
 
   def getslices( self, (nelems,) ):
-    slices = [ slice(i,i+3) for i in range(nelems) ]
+    N, = self.getdofshape( [nelems] )
+    slices = [ slice(max(0,i),min(N,i+3)) for i in numpy.arange(nelems)-self.rmfirst ]
     for n in self.sorted_ifaces( nelems ):
-      slices[n-2] = slice(n-2,n+2)
-      slices[n+1] = slice(n,n+4)
+      i = n - self.rmfirst
+      slices[n-2] = slice(max(0,i-2),i+2)
+      slices[n+1] = slice(i,min(N,i+4))
     return [ slices ]
 
   def getstdelems( self, (nelems,) ):
@@ -100,6 +112,10 @@ class ModSpline2( BasisBuilder ):
       stdelems[n-1] = stdelems[n-1].extract( [[1,0,0],[0,1,1],[0,-1,1]] )
       stdelems[n+0] = stdelems[n+0].extract( [[1,1,0],[-1,1,0],[0,0,1]] )
       stdelems[n+1] = stdelems[n+1].extract( [[-1,1,0,0],[0,0,1,0],[0,0,0,1]] )
+    if self.rmfirst:
+      stdelems[0] = stdelems[0].extract( numpy.eye(stdelems[0].nshapes)[:,1:] )
+    if self.rmlast:
+      stdelems[-1] = stdelems[-1].extract( numpy.eye(stdelems[-1].nshapes)[:,:-1] )
     return stdelems
 
 
@@ -107,17 +123,17 @@ def example():
 
   verts = numpy.arange(10)
   domain, geom = mesh.rectilinear( [ verts ] )
-  basis = ModSpline2(2,-3).build(domain)
+  basis = ModSpline2( [2,-3], rmlast=True ).build(domain)
   x, y = domain.elem_eval( [ geom[0], basis ], ischeme='bezier9' )
   with plot.PyPlot( '1D' ) as plt:
     plt.plot( x, y, '-' )
 
   domain, geom = mesh.rectilinear( [ numpy.arange(5) ] * 2 )
-  basis = ( Spline(1) * ModSpline2(2) ).build(domain)
+  basis = ( Spline(1,rmfirst=True) * ModSpline2( [2] ) ).build(domain)
   x, y = domain.elem_eval( [ geom, basis ], ischeme='bezier5' )
   with plot.PyPlot( '1D' ) as plt:
     for i, yi in enumerate( y.T ):
-      plt.subplot( 5, 6, i+1 )
+      plt.subplot( 4, 6, i+1 )
       plt.mesh( x, yi )
       plt.gca().set_axis_off()
 
