@@ -90,7 +90,8 @@ class ModSpline2( BasisBuilder ):
 
   def sorted_ifaces( self, nelems ):
     ifaces = numpy.sort([ nelems+iface if iface < 0 else iface for iface in self.ifaces ])
-    assert ifaces[0] >= 2 and numpy.all( numpy.diff(ifaces) >= 4 ) and ifaces[-1] <= nelems-2
+    diff = numpy.diff( ifaces )
+    assert ifaces[0] >= 2 and numpy.all( (diff>=4) | (diff==2) ) and ifaces[-1] <= nelems-2
     return ifaces
 
   def getdofshape( self, (nelems,) ):
@@ -107,11 +108,14 @@ class ModSpline2( BasisBuilder ):
 
   def getstdelems( self, (nelems,) ):
     stdelems = element.PolyLine.spline( degree=2, nelems=nelems )
+    A = numpy.eye( 6, 6 )
+    A[2:4] = A[2]+A[3], A[3]-A[2]
     for n in self.sorted_ifaces( nelems ):
-      stdelems[n-2] = stdelems[n-2].extract( [[1,0,0,0],[0,1,0,0],[0,0,1,1]] )
-      stdelems[n-1] = stdelems[n-1].extract( [[1,0,0],[0,1,1],[0,-1,1]] )
-      stdelems[n+0] = stdelems[n+0].extract( [[1,1,0],[-1,1,0],[0,0,1]] )
-      stdelems[n+1] = stdelems[n+1].extract( [[-1,1,0,0],[0,0,1,0],[0,0,0,1]] )
+      stdelems[n-2] = stdelems[n-2].extract( A[0:3,0:4] )
+      i = 4 - stdelems[n-1].nshapes
+      stdelems[n-1] = stdelems[n-1].extract( A[i:4,i:4] )
+      stdelems[n+0] = stdelems[n+0].extract( A[2:5,2:5] )
+      stdelems[n+1] = stdelems[n+1].extract( A[3:6,2:6] )
     if self.rmfirst:
       stdelems[0] = stdelems[0].extract( numpy.eye(stdelems[0].nshapes)[:,1:] )
     if self.rmlast:
@@ -128,10 +132,17 @@ def example():
   with plot.PyPlot( '1D' ) as plt:
     plt.plot( x, y, '-' )
 
+  verts = numpy.arange(10)
+  domain, geom = mesh.rectilinear( [ verts ] )
+  basis = ModSpline2( [2,4], rmlast=True ).build(domain)
+  x, y = domain.elem_eval( [ geom[0], basis ], ischeme='bezier9' )
+  with plot.PyPlot( '1Ddense' ) as plt:
+    plt.plot( x, y, '-' )
+
   domain, geom = mesh.rectilinear( [ numpy.arange(5) ] * 2 )
   basis = ( Spline(1,rmfirst=True) * ModSpline2( [2] ) ).build(domain)
   x, y = domain.elem_eval( [ geom, basis ], ischeme='bezier5' )
-  with plot.PyPlot( '1D' ) as plt:
+  with plot.PyPlot( '2D' ) as plt:
     for i, yi in enumerate( y.T ):
       plt.subplot( 4, 6, i+1 )
       plt.mesh( x, yi )
