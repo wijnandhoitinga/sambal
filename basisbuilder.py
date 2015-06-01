@@ -102,8 +102,9 @@ class ModSpline2( BasisBuilder ):
 
   def sorted_ifaces( self, nelems ):
     ifaces = numpy.sort([ nelems+iface if iface < 0 else iface for iface in self.ifaces ])
-    diff = numpy.diff( ifaces )
-    assert ifaces[0] >= 2 and numpy.all( (diff>=4) | (diff==2) ) and ifaces[-1] <= nelems-2
+    if len(ifaces):
+      diff = numpy.diff( ifaces )
+      assert ifaces[0] >= 2 and numpy.all( (diff>=4) | (diff==2) ) and ifaces[-1] <= nelems-2
     return ifaces
 
   def getdofshape( self, (nelems,) ):
