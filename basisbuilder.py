@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 
-from nutils import topology, element, function
+from nutils import topology, element, function, plot, util, mesh
 import numpy
 
 
@@ -103,8 +103,24 @@ class ModSpline2( BasisBuilder ):
     return stdelems
 
 
-# EXAMPLE
-#
-# domain, geom = mesh.rectilinear( [ xnodes, ynodes, znodes ] )
-# basis1 = ( ModSpline2(2,-2) * Spline(1) * Spline(0) ).build( domain )
-# basis2 = ( Spline(1) * ModSpline2(4) * Spline(0) ).build( domain )
+def example():
+
+  verts = numpy.arange(10)
+  domain, geom = mesh.rectilinear( [ verts ] )
+  basis = ModSpline2(2,-3).build(domain)
+  x, y = domain.elem_eval( [ geom[0], basis ], ischeme='bezier9' )
+  with plot.PyPlot( '1D' ) as plt:
+    plt.plot( x, y, '-' )
+
+  domain, geom = mesh.rectilinear( [ numpy.arange(5) ] * 2 )
+  basis = ( Spline(1) * ModSpline2(2) ).build(domain)
+  x, y = domain.elem_eval( [ geom, basis ], ischeme='bezier5' )
+  with plot.PyPlot( '1D' ) as plt:
+    for i, yi in enumerate( y.T ):
+      plt.subplot( 5, 6, i+1 )
+      plt.mesh( x, yi )
+      plt.gca().set_axis_off()
+
+
+if __name__ == '__main__':
+  util.run( example )
