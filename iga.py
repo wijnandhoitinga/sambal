@@ -29,7 +29,7 @@ class bspline ( object ):
     geom =self.basis.vector(2).dot( self.controlpoints.T.ravel() )
     return self.topology, geom
 
-def read_from_autocad ( fname ):
+def read_from_autocad ( fname, must_be_uniform=False ):
 
   dxf = dxfgrabber.readfile( fname )
 
@@ -58,12 +58,20 @@ def read_from_autocad ( fname ):
           u_knots_list = acis_data.pop(0).split()
           u_knots = map(float,u_knots_list[0::2])
 
+          if must_be_uniform==True:
+            delta = numpy.array(u_knots[1:])-numpy.array(u_knots[:-1])
+            assert numpy.std( delta ) < 1e-6 * numpy.mean( delta ), 'Non-uniform u-knot vector not permitted'
+
           u_mults = map(int,u_knots_list[1::2])
           u_mults[0]=p_u+1
           u_mults[-1]=p_u+1
 
           v_knots_list = acis_data.pop(0).split()
           v_knots = map(float,v_knots_list[0::2])
+
+          if must_be_uniform==True:
+            delta = numpy.array(v_knots[1:])-numpy.array(v_knots[:-1])
+            assert numpy.std( delta ) < 1e-6 * numpy.mean( delta ), 'Non-uniform v-knot vector not permitted'
 
           v_mults = map(int,v_knots_list[1::2])
           v_mults[0]=p_v+1
