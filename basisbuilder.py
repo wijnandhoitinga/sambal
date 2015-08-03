@@ -23,7 +23,7 @@ class BasisBuilder( object ):
 
     ndofs = numpy.product(dofshape)
     dofs = numpy.arange( ndofs ).reshape( dofshape )
-    idx = numpy.frompyfunc( lambda *s: dofs[s].ravel(), len(slices), 1 )( *numpy.ix_( *slices ) )
+    idx = numpy.frompyfunc( lambda *s: dofs[numpy.ix_(*s)].ravel(), len(slices), 1 )( *numpy.ix_( *slices ) )
     return function.function(
       fmap = { elem.transform: ((funcs,None),) for elem, funcs in numpy.broadcast( topo.structure, stdelems ) },
       nmap = { elem.transform: dofs for elem, dofs in numpy.broadcast( topo.structure, idx ) },
@@ -75,7 +75,7 @@ class Spline( BasisBuilder ):
       N, = self.getdofshape( [nelems] )
     else:
       N = numpy.inf
-    slices = [ slice(max(0,i),min(N,i+self.degree+1)) for i in numpy.arange(nelems)-self.rmfirst ]
+    slices = [ numpy.arange(max(0,i),min(N,i+self.degree+1)) for i in numpy.arange(nelems)-self.rmfirst ]
     if self.periodic:
       idofs = numpy.arange(nelems+self.degree) % nelems
       slices[-self.degree:] = [ idofs[s] for s in slices[-self.degree:] ]
@@ -88,79 +88,71 @@ class Spline( BasisBuilder ):
     if self.rmlast:
       stdelems[-1] = stdelems[-1].extract( numpy.eye(stdelems[-1].nshapes)[:,:-1] )
     return stdelems
-    
 
-class ModSpline2( BasisBuilder ):
 
-  def __init__( self, ifaces, rmfirst=False, rmlast=False, periodic=False ):
-    self.ifaces = tuple(ifaces)
-    assert not periodic or not rmfirst and not rmlast
-    self.rmfirst = rmfirst
-    self.rmlast = rmlast
-    self.periodic = periodic
+class Mod( BasisBuilder ):
+
+  def __init__( self, bbuilder, vertex ):
+    assert bbuilder.ndims == 1
+    self.bbuilder = bbuilder
+    self.vertex = vertex
     BasisBuilder.__init__( self, ndims=1 )
 
-  def sorted_ifaces( self, nelems ):
-    ifaces = numpy.sort([ nelems+iface if iface < 0 else iface for iface in self.ifaces ])
-    if len(ifaces):
-      diff = numpy.diff( ifaces )
-      assert ifaces[0] >= 2 and numpy.all( (diff>=4) | (diff==2) ) and ifaces[-1] <= nelems-2
-    return ifaces
+  def getdofshape( self, shape ):
+    return self.bbuilder.getdofshape( shape )
 
-  def getdofshape( self, (nelems,) ):
-    ndofs = nelems if self.periodic else nelems + 2 - self.rmfirst - self.rmlast
-    return ndofs,
+  def getmoddofs( self, shape ):
+    slices, = self.bbuilder.getslices( shape )
+    s1 = slices[self.vertex-1]
+    s2 = slices[self.vertex]
+    isect = set(s1) & set(s2)
+    assert len(isect) == 2
+    return sorted(isect)
 
-  def getslices( self, (nelems,) ):
-    if self.rmlast:
-      N, = self.getdofshape( [nelems] )
-    else:
-      N = numpy.inf
-    slices = [ slice(max(0,i),min(N,i+3)) for i in numpy.arange(nelems)-self.rmfirst ]
-    for n in self.sorted_ifaces( nelems ):
-      i = n - self.rmfirst
-      slices[n-2] = slice(max(0,i-2),i+2)
-      slices[n+1] = slice(i,min(N,i+4))
-    if self.periodic:
-      idofs = numpy.arange(nelems+2) % nelems
-      slices[-2:] = [ idofs[s] for s in slices[-2:] ]
-    return slices,
+  def getslices( self, shape ):
+    slices, = self.bbuilder.getslices( shape )
+    n1, n2 = self.getmoddofs( shape )
+    return [ numpy.hstack([s,n1]) if n2 in s and n1 not in s else numpy.hstack([s,n2]) if n1 in s and n2 not in s else s for s in slices ],
 
-  def getstdelems( self, (nelems,) ):
-    stdelems = element.PolyLine.spline( degree=2, nelems=nelems, periodic=self.periodic )
-    A = numpy.eye( 6, 6 )
-    A[2:4] = A[2]+A[3], A[3]-A[2]
-    for n in self.sorted_ifaces( nelems ):
-      stdelems[n-2] = stdelems[n-2].extract( A[0:3,0:4] )
-      i = 4 - stdelems[n-1].nshapes
-      stdelems[n-1] = stdelems[n-1].extract( A[i:4,i:4] )
-      stdelems[n+0] = stdelems[n+0].extract( A[2:5,2:5] )
-      stdelems[n+1] = stdelems[n+1].extract( A[3:6,2:6] )
-    if self.rmfirst:
-      stdelems[0] = stdelems[0].extract( numpy.eye(stdelems[0].nshapes)[:,1:] )
-    if self.rmlast:
-      stdelems[-1] = stdelems[-1].extract( numpy.eye(stdelems[-1].nshapes)[:,:-1] )
-    return stdelems
+  def getstdelems( self, shape ):
+    stdelems = self.bbuilder.getstdelems( shape )
+    slices, = self.bbuilder.getslices( shape )
+    n1, n2 = self.getmoddofs( shape )
+    modstdelems = []
+    for stdelem, s in zip( stdelems, slices ):
+      i1 = s == n1
+      i2 = s == n2
+      if not i1.any() and not i2.any():
+        modstdelems.append( stdelem )
+        continue
+      A = numpy.eye( stdelem.nshapes )
+      if not i1.any() or not i2.any():
+        A = numpy.hstack([ A, A[:,i1|i2] ])
+        A[:,i2] *= -1
+      else:
+        A[:,i1|i2] = numpy.hstack([ A[:,i1]+A[:,i2], A[:,i1]-A[:,i2] ])
+      modstdelems.append( stdelem.extract( A ) )
+    return modstdelems
 
 
 def example():
 
   verts = numpy.arange(10)
   domain, geom = mesh.rectilinear( [ verts ] )
-  basis = ModSpline2( [2,-3], rmlast=True ).build(domain)
+  basis = Mod( Mod( Spline( degree=2, rmlast=True ), 2 ), -3 ).build(domain)
   x, y = domain.elem_eval( [ geom[0], basis ], ischeme='bezier9' )
   with plot.PyPlot( '1D' ) as plt:
     plt.plot( x, y, '-' )
 
   verts = numpy.arange(10)
   domain, geom = mesh.rectilinear( [ verts ] )
-  basis = ModSpline2( [2,4], periodic=True ).build(domain)
+  basis = Mod( Mod( Spline( degree=2, periodic=True ), 2 ), 4 ).build(domain)
   x, y = domain.elem_eval( [ geom[0], basis ], ischeme='bezier9' )
   with plot.PyPlot( '1D' ) as plt:
     plt.plot( x, y, '-' )
 
   domain, geom = mesh.rectilinear( [ numpy.arange(5) ] * 2 )
-  basis = ( Spline( degree=1, rmfirst=True ) * ModSpline2( [2], periodic=True ) ).build(domain)
+  basis = ( Spline( degree=1, rmfirst=True ) * Mod( Spline( degree=2, periodic=True ), 2 ) ).build(domain)
   x, y = domain.elem_eval( [ geom, basis ], ischeme='bezier5' )
   with plot.PyPlot( '2D' ) as plt:
     for i, yi in enumerate( y.T ):
