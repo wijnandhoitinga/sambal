@@ -5,6 +5,13 @@ from nutils import topology, element, function, plot, util, mesh
 import numpy
 
 
+def objvec( items ):
+  items = tuple(items)
+  A = numpy.empty( len(items), dtype=object )
+  A[...] = items
+  return A
+
+
 class BasisBuilder( object ):
 
   def __init__( self, ndims ):
@@ -23,7 +30,9 @@ class BasisBuilder( object ):
 
     ndofs = numpy.product(dofshape)
     dofs = numpy.arange( ndofs ).reshape( dofshape )
-    idx = numpy.frompyfunc( lambda *s: dofs[numpy.ix_(*s)].ravel(), len(slices), 1 )( *numpy.ix_( *slices ) )
+    idx = objvec( dofs[s] for s in slices[0] ) if self.ndims == 1 \
+     else numpy.frompyfunc( lambda *s: dofs[numpy.ix_(*s)].ravel(), len(slices), 1 )( *numpy.ix_( *slices ) )
+
     return function.function(
       fmap = { elem.transform: ((funcs,None),) for elem, funcs in numpy.broadcast( topo.structure, stdelems ) },
       nmap = { elem.transform: dofs for elem, dofs in numpy.broadcast( topo.structure, idx ) },
@@ -90,6 +99,72 @@ class Spline( BasisBuilder ):
     return stdelems
 
 
+class BSpline( BasisBuilder ):
+
+  def __init__( self, degree, knotvalues=None, knotmultiplicities=None ):
+    self.degree = degree
+    self.knotvalues = knotvalues
+    self.knotmultiplicities = knotmultiplicities
+    BasisBuilder.__init__( self, ndims=1 )
+
+  def getdofshape( self, (n,) ):
+    p = self.degree
+    m = self._knotmultiplicities(n)
+    return sum(m[1:-1]) + p+1,
+
+  def getslices( self, (n,) ):
+    p = self.degree
+    m = self._knotmultiplicities(n)
+    offsets = numpy.cumsum(m[:-1]) - (p+1)
+    return [ offset + numpy.arange(p+1) for offset in offsets ],
+
+  def getstdelems( self, (n,) ):
+    p = self.degree
+    k = self._knotvalues(n)
+    m = self._knotmultiplicities(n)
+    km = numpy.concatenate([ [ki] * mi for ki, mi in zip(k,m) ])
+    offsets = numpy.cumsum(m[:-1]) - p
+    return [ element.PolyLine( self._localsplinebasis( km[offset:offset+2*p] - km[offset] ) ) for offset in offsets ]
+
+  def _knotmultiplicities( self, n ):
+    p = self.degree
+    m = numpy.ones( n+1, dtype=int ) if self.knotmultiplicities is None else numpy.array( self.knotmultiplicities )
+    m[0] = m[-1] = p+1
+    assert len(m) == n+1, 'knot vector size does not match the topology size'
+    assert min(m) > 0 and max(m) <= p+1, 'incorrect multiplicity encountered'
+    return m
+
+  def _knotvalues( self, n ):
+    k = numpy.arange(n+1) if self.knotvalues is None else numpy.array( self.knotvalues )
+    assert len(k) == n+1, 'knot vector size does not match the topology size'
+    return k
+
+  @staticmethod
+  def _localsplinebasis( lknots ):
+    lknots = numpy.asarray( lknots, dtype=float )
+    p = len(lknots) // 2
+    assert len(lknots) == 2*p, 'expected even number of local knots'
+    #Based on Algorithm A2.2 Piegl and Tiller
+    N = [ numpy.poly1d([1.]) ]
+    if p > 0:
+      assert numpy.all( lknots[:-1]-lknots[1:] < numpy.spacing(1) ), 'local knot vector should be non-decreasing'
+      assert lknots[p]-lknots[p-1] > numpy.spacing(1), 'element size should be positive'
+      xi = numpy.poly1d( [lknots[p]-lknots[p-1],lknots[p-1]] )
+      left  = []
+      right = []
+      for i in range(p):
+        left.append( xi - lknots[p-i-1] )
+        right.append( -xi + lknots[p+i] )
+        saved = 0.
+        for r in range(i+1):
+          temp = N[r] / (lknots[p+r]-lknots[p+r-i-1])
+          N[r] = saved + right[r]*temp
+          saved = left[i-r]*temp
+        N.append( saved )
+    assert all( Ni.order == p for Ni in N )
+    return numpy.array([Ni.coeffs for Ni in N]).T[::-1]
+
+
 class Mod( BasisBuilder ):
 
   def __init__( self, bbuilder, vertex ):
@@ -136,6 +211,13 @@ class Mod( BasisBuilder ):
 
 
 def example():
+
+  verts = 0,1,3,4,10
+  domain, geom = mesh.rectilinear( [ verts ] )
+  basis = BSpline( degree=2, knotvalues=verts, knotmultiplicities=[1,2,3,1,1] ).build(domain)
+  x, y = domain.elem_eval( [ geom[0], basis ], ischeme='bezier9' )
+  with plot.PyPlot( '1D' ) as plt:
+    plt.plot( x, y, '-' )
 
   verts = numpy.arange(10)
   domain, geom = mesh.rectilinear( [ verts ] )
