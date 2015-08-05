@@ -253,7 +253,6 @@ class Font( object ):
     self.A.grow( length=numpy.sqrt(1.25) )
     self.A.move( absolute=[0.23,0.4], absangle=0 )
     self.A.grow( length=0.53)
-
     self.A.move( absolute=[1.2,0.0], absangle=0 )
 
     self.C = Curve( orig=0.5+numpy.array([0.25*numpy.sqrt(2),0.25*numpy.sqrt(2)]), angle=3*pi/4 )
@@ -357,6 +356,12 @@ class Font( object ):
     self.U.grow( length=0.5 )
     self.U.move( absolute=[1.2,0.0], absangle=0 )
 
+    self.v = Curve( orig=[0.25,0.5], angle=-1*pi/3 )
+    self.v.grow( length=numpy.sqrt(.25**2+.25) )
+    self.v.grow( angle=4*pi/3, curvature=1000 )
+    self.v.grow( length=numpy.sqrt(.25**2+.25) )
+    self.v.move( absolute=[1.2,0.0], absangle=0 )
+
     self.Z = Curve( orig=[0.0,1.0], angle=0 )
     self.Z.grow( length=1.0 )
     self.Z.grow( angle=3.*pi/4., curvature=1000 )
@@ -371,7 +376,7 @@ class Font( object ):
     if orig is not None:
       text.move( absolute=orig )
     for iletter, letter in enumerate( letters ):
-      text += getattr( self, letter.upper() ).scale( factor=fontsize )
+      text += getattr( self, letter ).scale( factor=fontsize )
       text.move( length=spacing )
 
     self.line = text
