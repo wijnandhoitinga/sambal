@@ -25,7 +25,7 @@ class BasisBuilder( object ):
     assert topo.ndims == self.ndims
 
     dofshape = self.getdofshape( topo.structure.shape )
-    slices = self.getslices( topo.structure.shape )
+    slices = map( objvec, self.getslices( topo.structure.shape ) )
     stdelems = self.getstdelems( topo.structure.shape )
 
     ndofs = numpy.product(dofshape)
