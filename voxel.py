@@ -3,16 +3,16 @@ from nutils import *
 class TopoMap( function.ArrayFunc ):
   """Topology mapping ArrayFunc wrapper
 
-  ArrayFunc wrapper for function evaluation on an arbitrary topology. 
+  ArrayFunc wrapper for function evaluation on an arbitrary topology.
 
   Args:
     func (ArrayFunc): ArrayFunc to be wrapper
     func_topo: Topology on which func can be evaluated
     geometry: Geometric map evaluable on the target topology
-    bounding_box: Extends of the geometry 
+    bounding_box: Extends of the geometry
 
   Returns:
-    func (:class:`TopoMap`): ArrayFunc 
+    func (:class:`TopoMap`): ArrayFunc
 
   """
 
@@ -42,9 +42,87 @@ class TopoMap( function.ArrayFunc ):
     for elem in numpy.unique( elems ):
       mask = (elems==elem)
       values[mask] = self.func.eval(elem,points[mask])
-    
+
     return values
 
+class VoxelData ( object ):
+
+  def __init__ ( self, data, bounding_box ):
+    self.data         = data
+    self.bounding_box = bounding_box
+
+    self.ndim  = self.data.ndim
+    self.shape = self.data.shape
+
+  @property
+  def lengths ( self ):
+    return tuple(bb[1]-bb[0] for bb in self.bounding_box)
+
+  @property
+  def volume( self ):
+    return numpy.prod( self.lengths )
+
+  @property
+  def spacing ( self ):
+    return tuple( l/float(sh) for l, sh in zip( self.lengths, self.shape ) )
+
+  @cache.property
+  def mesh ( self ):
+    return mesh.rectilinear( [ numpy.linspace( b[0], b[1], sh+1 ) for b,sh in zip(self.bounding_box,self.shape)] )
+
+  @property
+  def topo ( self ):
+    return self.mesh[0]
+
+  @property
+  def geom ( self ):
+    return self.mesh[1]
+
+  @cache.property
+  def func ( self ):
+    mapping = { elem.transform:value for elem,value in zip(self.topo.structure.ravel(),self.data.ravel()) }
+    return function.Elemwise( mapping, shape=() )
+
+  def __getitem__ ( self, Slice ):
+
+    if Slice is Ellipsis:
+      return self
+
+    if isinstance(Slice,slice):
+      if Slice==slice(None):
+        return self
+      Slice = (Slice,)*self.ndim
+
+    if isinstance(Slice,tuple):
+      assert len(Slice)==self.ndim
+
+      bounding_box = []
+      for d in range(self.ndim):
+        left_verts = numpy.linspace(self.bounding_box[d][0],self.bounding_box[d][1]-self.spacing[d],self.shape[d])[Slice[d]]
+        bounding_box.append( (left_verts[0],left_verts[-1]+self.spacing[d]) )
+
+      sliced = VoxelData( self.data[Slice], bounding_box )
+      numpy.testing.assert_allclose( sliced.spacing, self.spacing, rtol=0., atol=1e-14 )
+
+      return sliced
+
+    raise Exception('Unsupported slicing operation')
+
+  def coarsegrain ( self, ncg ):
+
+    if ncg < 1:
+      return self
+
+    cgshape = [d//(2**ncg) for d in self.data.shape]
+
+    log.info( 'Coarse grained data shape: (%s)' % ','.join(map(str,cgshape)) )
+
+    #Create the coarse grain domain
+    cgtopo, cggeom = mesh.rectilinear( [numpy.linspace( b[0], b[1], sh+1 ) for b,sh in zip(self.bounding_box,cgshape)] )
+    cgfunc = TopoMap( self.func, func_topo=self.topo, geometry=cggeom, bounding_box=self.bounding_box )
+    cgdata = cgtopo.elem_mean( cgfunc, geometry=cggeom, ischeme='uniform%i'%(2**ncg) )
+
+    return VoxelData( cgdata, self.bounding_box )
 
 def voxread ( fname ):
 
@@ -58,57 +136,56 @@ def voxread ( fname ):
     shape = tuple(int(fin.readline().strip()) for i in range(3))
     sdata = fin.readline().strip()
     assert len(sdata)==numpy.prod(shape), 'Incorrect data size'
-  
+
   #Convert to numpy array
   data = (numpy.fromstring( sdata, dtype=numpy.uint8 )==83).astype(float).reshape( shape )-0.5
 
   log.info( 'Original data shape: (%s)' % ','.join(map(str,data.shape)) )
 
   #Construct the domain and geometry
-  topo, geom = mesh.rectilinear( [ numpy.linspace( 0, sh*sp, sh+1 ) for sp,sh in zip(spacing,shape)] )
+  bb = [ [0,sh*sp] for sp,sh in zip(spacing,shape)]
 
-  #Cosntruct the ArrayFunc
-  mapping = { elem.transform:value for elem,value in zip(topo.structure.ravel(),data.ravel()) }
-  func = function.Elemwise( mapping, shape=() )
+  return VoxelData( data, bb )
 
-  return topo, geom, func
+def jsonread( fname ):
 
-def get_boundingbox( topo, geom ):
+  import json
+  from os import path
 
-  bb = []
+  assert path.isfile( fname ), 'File "%s" does not exist.' % fname
 
-  if topo.ndims == 2:
-    bb.append( [ topo.boundary['left']  .boundary['left'].integrate( geom[0], geometry=geom, ischeme='gauss1' ),
-                 topo.boundary['right'] .boundary['left'].integrate( geom[0], geometry=geom, ischeme='gauss1' )  ] )
-    bb.append( [ topo.boundary['bottom'].boundary['left'].integrate( geom[1], geometry=geom, ischeme='gauss1' ),
-                 topo.boundary['top']   .boundary['left'].integrate( geom[1], geometry=geom, ischeme='gauss1' )  ] )
-  if topo.ndims == 3:
-    bb.append( [ topo.boundary['left']  .boundary['left'].boundary['left'].integrate( geom[0], geometry=geom, ischeme='gauss1' ),
-                 topo.boundary['right'] .boundary['left'].boundary['left'].integrate( geom[0], geometry=geom, ischeme='gauss1' )  ] )
-    bb.append( [ topo.boundary['bottom'].boundary['left'].boundary['left'].integrate( geom[1], geometry=geom, ischeme='gauss1' ),
-                 topo.boundary['top']   .boundary['left'].boundary['left'].integrate( geom[1], geometry=geom, ischeme='gauss1' )  ] )
-    bb.append( [ topo.boundary['front'] .boundary['left'].boundary['left'].integrate( geom[2], geometry=geom, ischeme='gauss1' ),
-                 topo.boundary['back']  .boundary['left'].boundary['left'].integrate( geom[2], geometry=geom, ischeme='gauss1' )  ] )
+  dirname = path.dirname( fname )
 
-  return bb
+  jsondict = json.load( open(fname) )
 
-def coarsegrain ( topo, geom, func, ncg ):
+  fname   = jsondict['FNAME']
+  shape   = jsondict['DIMS']
+  spacing = jsondict['SIZE']
 
-  if ncg < 1:
-    return topo, geom, func
+  if not jsondict.has_key('FORMAT'):
+    dtype = '<i2' #Two byte integer little endian
+  else:
+    dtype = jsondict['FORMAT']
 
-  bb = get_boundingbox( topo, geom )
-  cgshape = [d//(2**ncg) for d in topo.structure.shape]
+  fname = path.join( dirname, fname )
 
-  log.info( 'Coarse grained data shape: (%s)' % ','.join(map(str,cgshape)) )
+  assert path.isfile( fname ), 'File "%s" does not exist.' % fname
 
-  #Create the coarse grain domain
-  cgtopo, cggeom = mesh.rectilinear( [numpy.linspace( b[0], b[1], sh+1 ) for b,sh in zip(bb,cgshape)] )
-  cgfunc = TopoMap( func, func_topo=topo, geometry=cggeom, bounding_box=bb )
-  cgdata = cgtopo.elem_mean( cgfunc, geometry=cggeom, ischeme='uniform%i'%(2**ncg) )
+  data = numpy.fromfile( file=open( fname, 'rb' ), dtype=dtype )[:numpy.prod( shape )].reshape( shape )
 
-  #Cosntruct the ArrayFunc
-  mapping = { elem.transform:value for elem,value in zip(cgtopo.structure.ravel(),cgdata) }
-  cgfunc = function.Elemwise( mapping, shape=() )
+  #Slice the data
+  if jsondict.has_key('SLICE'):
+    raise DeprecationWarning('SLICE key is no longer supported in the json metadata file')
 
-  return cgtopo, cggeom, cgfunc
+  #Shift to threshold
+  assert jsondict.has_key('THRESHOLD'), 'THRESHOLD VALUE MUST BE PROVIDED'
+  data = data - jsondict['THRESHOLD']
+
+  log.info( 'Original data shape: (%s)' % ','.join(map(str,data.shape)) )
+
+  #Construct the domain and geometry
+  bb = [[0,sh*sp] for sp,sh in zip(spacing,data.shape)]
+
+  return VoxelData( data, bb )
+
+# vim:shiftwidth=2:softtabstop=2:expandtab:foldmethod=indent:foldnestmax=2
