@@ -47,20 +47,57 @@ class TopoMap( function.ArrayFunc ):
 
 class VoxelData ( object ):
 
-  def __init__ ( self, data, bounding_box ):
+  def __init__ ( self, data, bounding_box, name='voxeldata' ):
+    self.name         = name
     self.data         = data
     self.bounding_box = bounding_box
 
     self.ndim  = self.data.ndim
     self.shape = self.data.shape
 
+  def __getitem__ ( self, Slice ):
+
+    if Slice is Ellipsis:
+      return self
+
+    if isinstance(Slice,slice):
+      if Slice==slice(None):
+        return self
+      Slice = (Slice,)*self.ndim
+
+    if isinstance(Slice,tuple):
+      assert len(Slice)==self.ndim
+
+      bounding_box = []
+      for d in range(self.ndim):
+        left_verts = numpy.linspace(self.bounding_box[d][0],self.bounding_box[d][1]-self.spacing[d],self.shape[d])[Slice[d]]
+        bounding_box.append( (left_verts[0],left_verts[-1]+self.spacing[d]) )
+
+      sliced = VoxelData( self.data[Slice], bounding_box, '.'.join([self.name,'sliced']) )
+      numpy.testing.assert_allclose( sliced.spacing, self.spacing, rtol=0., atol=1e-14 )
+
+      return sliced
+
+    raise Exception('Unsupported slicing operation')
+
+  def __str__ ( self ):
+    return '+---- %s ----+\n' % self.name + \
+           'Size     : ' + ' x '.join(str(d) for d in self.lengths) + '\n' + \
+           'Shape    : ' + ' x '.join(str(d) for d in self.shape) + '\n' + \
+           'Spacing  : ' + ' x '.join(str(d) for d in self.spacing) + '\n' + \
+           'Density  : %3.1f%%' % (100*self.density,)
+
   @property
   def lengths ( self ):
     return tuple(bb[1]-bb[0] for bb in self.bounding_box)
 
   @property
-  def volume( self ):
+  def volume ( self ):
     return numpy.prod( self.lengths )
+
+  @property
+  def density ( self, threshold=0. ):
+    return (self.data >= threshold).sum() / float(self.data.size)
 
   @property
   def spacing ( self ):
@@ -83,31 +120,6 @@ class VoxelData ( object ):
     mapping = { elem.transform:value for elem,value in zip(self.topo.structure.ravel(),self.data.ravel()) }
     return function.Elemwise( mapping, shape=() )
 
-  def __getitem__ ( self, Slice ):
-
-    if Slice is Ellipsis:
-      return self
-
-    if isinstance(Slice,slice):
-      if Slice==slice(None):
-        return self
-      Slice = (Slice,)*self.ndim
-
-    if isinstance(Slice,tuple):
-      assert len(Slice)==self.ndim
-
-      bounding_box = []
-      for d in range(self.ndim):
-        left_verts = numpy.linspace(self.bounding_box[d][0],self.bounding_box[d][1]-self.spacing[d],self.shape[d])[Slice[d]]
-        bounding_box.append( (left_verts[0],left_verts[-1]+self.spacing[d]) )
-
-      sliced = VoxelData( self.data[Slice], bounding_box )
-      numpy.testing.assert_allclose( sliced.spacing, self.spacing, rtol=0., atol=1e-14 )
-
-      return sliced
-
-    raise Exception('Unsupported slicing operation')
-
   def coarsegrain ( self, ncg ):
 
     if ncg < 1:
@@ -122,7 +134,7 @@ class VoxelData ( object ):
     cgfunc = TopoMap( self.func, func_topo=self.topo, geometry=cggeom, bounding_box=self.bounding_box )
     cgdata = cgtopo.elem_mean( cgfunc, geometry=cggeom, ischeme='uniform%i'%(2**ncg) )
 
-    return VoxelData( cgdata, self.bounding_box )
+    return VoxelData( cgdata, self.bounding_box, '.'.join([self.name,'coarsegrained']) )
 
 def voxread ( fname ):
 
@@ -180,8 +192,6 @@ def jsonread( fname ):
   #Shift to threshold
   assert jsondict.has_key('THRESHOLD'), 'THRESHOLD VALUE MUST BE PROVIDED'
   data = data - jsondict['THRESHOLD']
-
-  log.info( 'Original data shape: (%s)' % ','.join(map(str,data.shape)) )
 
   #Construct the domain and geometry
   bb = [[0,sh*sp] for sp,sh in zip(spacing,data.shape)]
