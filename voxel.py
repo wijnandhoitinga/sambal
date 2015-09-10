@@ -47,11 +47,12 @@ class TopoMap( function.ArrayFunc ):
 
 class VoxelData ( object ):
 
-  def __init__ ( self, data, bounding_box, name='voxeldata' ):
+  def __init__ ( self, data, bounding_box, name='voxeldata', squeeze=True ):
     self.name         = name
-    self.data         = data
-    self.bounding_box = bounding_box
-
+    if squeeze:
+      indi = filter( lambda i : data.shape[i]==1 , range(data.ndim) )
+      self.data = numpy.squeeze( data, axis=indi )
+      self.bounding_box = [ bounding_box[i] for i in range(data.ndim) if not i in indi ]
     self.ndim  = self.data.ndim
     self.shape = self.data.shape
 
@@ -74,7 +75,6 @@ class VoxelData ( object ):
         bounding_box.append( (left_verts[0],left_verts[-1]+self.spacing[d]) )
 
       sliced = VoxelData( self.data[Slice], bounding_box, '.'.join([self.name,'sliced']) )
-      numpy.testing.assert_allclose( sliced.spacing, self.spacing, rtol=0., atol=1e-14 )
 
       return sliced
 
@@ -120,7 +120,7 @@ class VoxelData ( object ):
     mapping = { elem.transform:value for elem,value in zip(self.topo.structure.ravel(),self.data.ravel()) }
     return function.Elemwise( mapping, shape=() )
 
-  def coarsegrain ( self, ncg ):
+  def coarsegrain ( self, ncg=1 ):
 
     if ncg < 1:
       return self
@@ -134,7 +134,7 @@ class VoxelData ( object ):
     cgfunc = TopoMap( self.func, func_topo=self.topo, geometry=cggeom, bounding_box=self.bounding_box )
     cgdata = cgtopo.elem_mean( cgfunc, geometry=cggeom, ischeme='uniform%i'%(2**ncg) )
 
-    return VoxelData( cgdata, self.bounding_box, '.'.join([self.name,'coarsegrained']) )
+    return VoxelData( cgdata.reshape( cgshape ), self.bounding_box, '.'.join([self.name,'coarsegrained']) )
 
 def voxread ( fname ):
 
