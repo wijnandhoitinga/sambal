@@ -92,6 +92,10 @@ class VoxelData ( object ):
     return tuple(bb[1]-bb[0] for bb in self.bounding_box)
 
   @property
+  def rng ( self ):
+    return ( numpy.amin(self.data), numpy.amax(self.data) )
+
+  @property
   def volume ( self ):
     return numpy.prod( self.lengths )
 
