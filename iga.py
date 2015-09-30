@@ -55,7 +55,12 @@ def read_from_autocad ( fname, must_be_uniform=False ):
 
           assert props_list[-9]=="nubs" and props_list[-10]=="full"
 
-          u_knots_list = acis_data.pop(0).split()
+          u_knots_list = []
+          while len(u_knots_list) < 2*k_u:
+            add = acis_data.pop(0).split()
+            assert len(add)>0, 'Expected additional u-knot data'
+            u_knots_list += add
+
           u_knots = map(float,u_knots_list[0::2])
 
           if must_be_uniform==True:
@@ -66,7 +71,12 @@ def read_from_autocad ( fname, must_be_uniform=False ):
           u_mults[0]=p_u+1
           u_mults[-1]=p_u+1
 
-          v_knots_list = acis_data.pop(0).split()
+          v_knots_list = []
+          while len(v_knots_list) < 2*k_v:
+            add = acis_data.pop(0).split()
+            assert len(add)>0, 'Expected additional v-knot data'
+            v_knots_list += add
+
           v_knots = map(float,v_knots_list[0::2])
 
           if must_be_uniform==True:
