@@ -7,7 +7,8 @@ class NewtonSolver( object ):
 
   def solve ( self, rtol, maxiter=25, atol=1e-12, **linearsolverargs ):
 
-    cons = self.system.get_cons()
+    cons = self.system.get_total_cons()-self.system.state
+
     residual, tangent = self.system.get_residual_and_tangent()
 
     for iiter in log.range( 'Newton iterations', maxiter ):
