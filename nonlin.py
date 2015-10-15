@@ -80,7 +80,7 @@ if __name__ == "__main__":
     def get_residual_and_tangent ( self ):
       return self.topo.integrate( [self.rfunc(),self.tanfunc()], geometry=self.geom, ischeme='gauss3' )
 
-    def get_cons ( self ):
+    def get_total_cons ( self ):
       cons  = self.topo.boundary['left'].project( 0, onto=self.funcsp, geometry=self.geom, ischeme='gauss1' )
       cons |= self.topo.boundary['left'].project( 0, onto=self.funcsp.grad(geom)[:,0], geometry=self.geom, ischeme='gauss1' )
       return cons
@@ -97,6 +97,6 @@ if __name__ == "__main__":
 
   system = NonlinearBeamSystem( topo=topo, geom=geom, funcsp=funcsp, E=E, I=I, A=A, q=q, size=funcsp.size )
 
-  system.solve( tol=1e-6 )
+  system.solve( rtol=1e-6 )
 
   log.info( 'Tip deflection: %4.3f (%4.3f)' % (system.state[-1],q*L**4/(8.*E*I)) )
