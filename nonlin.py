@@ -1,5 +1,9 @@
 from nutils import *
- 
+
+##########################################
+# Newton-Raphson solver                  #
+##########################################
+
 class NewtonSolver( object ):
 
   def __init__ ( self, system, state=None ):
@@ -33,6 +37,48 @@ class NewtonSolver( object ):
       log.error('Newton solver did not converge in %d iterations' % maxiter )
 
     return 0
+
+##########################################
+# Partitioned solver                     #
+##########################################
+
+class PartitionedSolver( object ):
+
+  def __init__ ( self, system, doforder, state=None ):
+    self.system = system
+    self.doforder = doforder
+    assert all(field in self.system.dofgroups for field in doforder)
+
+  def solve ( self, **linearsolverargs ):
+
+    state0 = self.system.state.copy()
+
+    for ifield in self.doforder:
+
+      #Select the subproblem
+      log.info( 'Solving subproblem "%s" with %d DOFs' % (ifield,len(self.system.dofgroups[ifield])) )
+
+      #Get the constraints for the current subproblem
+      icons = getattr( self.system, 'get_total_cons_' + ifield )()
+
+      #Constrain all the dofs that are not in the current subproblem
+      for jfield in self.doforder:
+        if ifield == jfield:
+          continue
+        jdofs = self.system.dofgroups[jfield]
+        icons[list(jdofs)] = self.system.state[list(jdofs)]
+
+      #Get the lhs and rhs for the current subproblem
+      ilhs, irhs = getattr( self.system, 'get_residual_and_tangent_' + ifield)()
+
+      #Solve the subproblem
+      self.system.state = ilhs.solve( b=irhs, constrain=icons, **linearsolverargs )
+
+    return True
+
+##########################################
+# System base class                      #
+##########################################
 
 class System ( object ):
 
