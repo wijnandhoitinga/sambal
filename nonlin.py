@@ -51,8 +51,6 @@ class PartitionedSolver( object ):
 
   def solve ( self, **linearsolverargs ):
 
-    state0 = self.system.state.copy()
-
     for ifield in self.doforder:
 
       #Select the subproblem
@@ -72,7 +70,7 @@ class PartitionedSolver( object ):
       ilhs, irhs = getattr( self.system, 'get_residual_and_tangent_' + ifield)()
 
       #Solve the subproblem
-      self.system.state = ilhs.solve( b=irhs, constrain=icons, **linearsolverargs )
+      self.system.state = ilhs.solve( rhs=irhs, constrain=icons, **linearsolverargs )
 
     return True
 
