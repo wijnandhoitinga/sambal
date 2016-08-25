@@ -18,7 +18,7 @@ class TopoMap( function.ArrayFunc ):
 
   def __init__( self, func, func_topo, geometry, bounding_box ):
 
-    assert isinstance( func_topo, topology.StructuredTopology )
+    assert isinstance( func_topo.basetopo, topology.StructuredTopology )
     assert geometry.ndim==1
     assert geometry.shape[0]==func_topo.ndims
     assert isinstance(bounding_box,list)
@@ -26,7 +26,7 @@ class TopoMap( function.ArrayFunc ):
     self.bb = numpy.array(bounding_box) #[[xmin,xmax],[ymin,ymax],...]
     assert self.bb.shape[1]==2
 
-    self.func_topo = func_topo.structure
+    self.func_topo = func_topo.basetopo.structure
     self.func = func
     function.ArrayFunc.__init__( self, args=[geometry], shape=func.shape )
 
@@ -39,7 +39,13 @@ class TopoMap( function.ArrayFunc ):
 
     elems  = numpy.array([self.func_topo[tuple(ind)] for ind in indi])
     values = numpy.zeros( shape=(points.shape[:1]+self.func.shape) )
-    for elem in numpy.unique( elems ):
+    uniqueelems = []
+    for elem in elems:
+      if elem in uniqueelems:
+        continue
+      uniqueelems.append( elem )
+
+    for elem in uniqueelems:
       mask = (elems==elem)
       values[mask] = self.func.eval(elem,points[mask])
 
@@ -121,7 +127,7 @@ class VoxelData ( object ):
 
   @cache.property
   def func ( self ):
-    mapping = { elem.transform:value for elem,value in zip(self.topo.structure.ravel(),self.data.ravel()) }
+    mapping = { elem.transform:value for elem,value in zip(self.topo.basetopo.structure.ravel(),self.data.ravel()) }
     return function.Elemwise( mapping, shape=() )
 
   def coarsegrain ( self, ncg=1 ):
@@ -178,7 +184,7 @@ def jsonread( fname ):
   shape   = jsondict['DIMS']
   spacing = jsondict['SIZE']
 
-  if not jsondict.has_key('FORMAT'):
+  if not 'FORMAT' in jsondict:
     dtype = '<i2' #Two byte integer little endian
   else:
     dtype = jsondict['FORMAT']
@@ -190,12 +196,13 @@ def jsonread( fname ):
   data = numpy.fromfile( file=open( fname, 'rb' ), dtype=dtype )[:numpy.prod( shape )].reshape( shape )
 
   #Slice the data
-  if jsondict.has_key('SLICE'):
+  if 'SLICE' in jsondict:
     raise DeprecationWarning('SLICE key is no longer supported in the json metadata file')
 
   #Shift to threshold
-  assert jsondict.has_key('THRESHOLD'), 'THRESHOLD VALUE MUST BE PROVIDED'
+  assert 'THRESHOLD' in jsondict, 'THRESHOLD VALUE MUST BE PROVIDED'
   data = data - jsondict['THRESHOLD']
+
 
   #Construct the domain and geometry
   bb = [[0,sh*sp] for sp,sh in zip(spacing,data.shape)]
