@@ -169,6 +169,17 @@ def voxread ( fname ):
 
   return VoxelData( data, bb )
 
+def imageread( fname, name='imagedata' ):
+
+  from PIL import Image
+
+  #Read the data
+  data = numpy.array( Image.open( fname ) ).astype(int)
+
+  assert data.ndim==2, 'Expected two-dimensional image'
+
+  return VoxelData( data, [[0.,shp] for shp in data.shape], name=name )
+
 def jsonread( fname ):
 
   import json
