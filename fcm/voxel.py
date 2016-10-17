@@ -180,6 +180,20 @@ def imageread( fname, name='imagedata' ):
 
   return VoxelData( data, [[0.,shp] for shp in data.shape], name=name )
 
+def npzread( fname, name='npzdata' ):
+
+  data=numpy.load('aorta.npz')
+
+  #Assert that the voxels are all of the same size
+  for key in ['x','y','z']:
+    spacing = data[key][1:]-data[key][:-1]
+    numpy.testing.assert_allclose( spacing, spacing[0], err_msg='Grid is not equidistantly spaced' )
+
+  #Bounding box
+  bb = [ [data[key][0],data[key][-1]] for key in ['x','y','z'] ]
+
+  return VoxelData( data['array3d'], bb, name=name )
+
 def jsonread( fname ):
 
   import json
