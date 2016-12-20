@@ -1,4 +1,4 @@
-from nutils import function, numeric, _
+from nutils import function, numeric, _, debug
 import numpy
 
 _sqr = lambda x: numeric.contract_fast( x, x, 1 ) # _sqr(x) = norm2(x)**2
@@ -36,7 +36,7 @@ class Curve( object ):
     return self.cumlen[-1]
 
   
-  def grow( self, length=None, angle=None, curvature=0 ):
+  def grow( self, length=None, angle=None, curvature=0, flag=False ):
 
     if length is None:
       assert angle is not None
@@ -58,7 +58,8 @@ class Curve( object ):
       phi1 = phi0 - length * curvature
       self.angle = phi1 - .5 * numpy.pi
       segment = Arc( origin=origin, radius=radius, phi0=phi0, phi1=phi1 )
-
+    
+    segment.flag = flag
     self.current = segment.xy1
     self.cumlen.append( self.cumlen[-1] + segment.length )
     self.segments.append( segment )
@@ -94,7 +95,7 @@ class Curve( object ):
         dist2s = dist2
         alphas = alpha
       else:
-        smaller = function.less(dist2, dist2s)
+        smaller = dist2<dist2s#function.less(dist2, dist2s)
         dist2s[smaller] = dist2[smaller]
         alphas[smaller] = alpha[smaller] + i
     return alphas
@@ -126,14 +127,21 @@ class Curve( object ):
     for i, index in self.lump_integers( cumalpha ):
       lenghts[index] = self.cumlen[i] + (cumalpha[index]-i) * self.segments[i].length
     return lenghts
+  
+  def pathflag( self, cumalpha ):
+    flags = numpy.empty( len(cumalpha) )
+    for i, index in self.lump_integers( cumalpha ):
+      flags[index] = self.segments[i].flag*numpy.ones_like(self.getcoords(cumalpha))
+    return flags
 
 class Segment( object ):
 
-  def __init__( self, xy0, xy1, length ):
+  def __init__( self, xy0, xy1, length, flag=False ):
     self.xy0 = xy0
     self.xy1 = xy1
     self.length = length
-
+    self.flag = flag
+  
 
 def rotmat( angle ):
   sin = numpy.sin( angle )
@@ -214,35 +222,40 @@ class Arc( Segment ):
 
 
 
-class FindClosest( function.ArrayFunc ):
+class FindClosest( function.Array ):
   def __init__( self, curve, coords ):
     self.curve = curve
-    function.ArrayFunc.__init__( self, args=[coords], shape=() )
+    function.Array.__init__( self, args=[coords], shape=(), dtype=float )
   def evalf( self, coords ):
     return self.curve.findclosest(coords)
 
-class PathCoords( function.ArrayFunc ):
+class PathCoords( function.Array ):
   def __init__( self, curve, alpha ):
     self.curve = curve
-    function.ArrayFunc.__init__( self, args=[alpha], shape=(2,) )
+    function.Array.__init__( self, args=[alpha], shape=(2,), dtype=float )
   def evalf( self, alpha ):
     return self.curve.getcoords(alpha)
 
-
-class PathTangent( function.ArrayFunc ):
+class PathTangent( function.Array ):
   def __init__( self, curve, alpha ):
     self.curve = curve
-    function.ArrayFunc.__init__( self, args=[alpha], shape=(2,) )
+    function.Array.__init__( self, args=[alpha], shape=(2,), dtype=float )
   def evalf( self, alpha ):
     return self.curve.tangent(alpha)
 
-class PathLength( function.ArrayFunc ):
+class PathLength( function.Array ):
   def __init__( self, curve, alpha ):
     self.curve = curve
-    function.ArrayFunc.__init__( self, args=[alpha], shape=() )
+    function.Array.__init__( self, args=[alpha], shape=(), dtype=float )
   def evalf( self, alpha ):
     return self.curve.pathlen(alpha)
 
+class PathFlag( function.Array ):
+  def __init__( self, curve, alpha ):
+    self.curve = curve
+    function.Array.__init__( self, args=[alpha], shape=(), dtype=float )
+  def evalf( self, alpha ):
+    return self.curve.pathflag(alpha)
 
 class Font( object ):
   def __init__( self ):
