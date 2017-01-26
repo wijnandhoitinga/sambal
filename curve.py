@@ -84,7 +84,7 @@ class Curve( object ):
     return Curve( orig=self.current*factor, angle=self.angle, segments=segments )
 
   def sample( self, spacing ):
-    return numpy.concatenate( [ segment.getcoords( numpy.linspace(0,1,segment.length/spacing) ) for segment in self.segments ], axis=0 )
+    return numpy.concatenate( [ segment.getcoords( numpy.linspace(0,1,segment.length/spacing, endpoint=False) ) for segment in self.segments ], axis=0 )
 
   def findclosest( self, xy ):
     assert self.segments
@@ -152,8 +152,8 @@ def rotate( x, angle ):
   return numpy.dot( rotmat(angle), x )
 
 class Line( Segment ):
-  def __init__( self, xy0, xy1 ):
-    Segment.__init__( self, xy0, xy1, numpy.linalg.norm(xy0-xy1) )
+  def __init__( self, xy0, xy1, flag=False ):
+    Segment.__init__( self, xy0, xy1, numpy.linalg.norm(xy0-xy1), flag=flag )
     self.type = 'Line'
 
   def getcoords( self, alpha ):
@@ -174,16 +174,16 @@ class Line( Segment ):
     return Line( xy0=xy0, xy1=xy1 )
 
   def scale( self, factor ):
-    return Line( xy0=self.xy0*factor, xy1=self.xy1*factor )
+    return Line( xy0=self.xy0*factor, xy1=self.xy1*factor, flag=self.flag )
     
 
 class Arc( Segment ):
-  def __init__( self, origin, radius, phi0, phi1 ):
+  def __init__( self, origin, radius, phi0, phi1, flag=False ):
 
     xy0 = origin + radius * numpy.array([ -numpy.sin(phi0-.5*numpy.pi), numpy.cos(phi0-.5*numpy.pi) ])
     xy1 = origin + radius * numpy.array([ -numpy.sin(phi1-.5*numpy.pi), numpy.cos(phi1-.5*numpy.pi) ])
     length = abs( (phi1-phi0) * radius )
-    Segment.__init__( self, xy0, xy1, length )
+    Segment.__init__( self, xy0, xy1, length, flag=flag )
 
     self.origin = origin
     self.radius = radius
@@ -217,7 +217,7 @@ class Arc( Segment ):
     return Arc( origin=origin, radius=self.radius, phi0=phi0, phi1=phi1 ) 
 
   def scale( self, factor ):
-    return Arc( origin=self.origin*factor, radius=self.radius*factor, phi0=self.phi0, phi1=self.phi1 )
+    return Arc( origin=self.origin*factor, radius=self.radius*factor, phi0=self.phi0, phi1=self.phi1, flag=self.flag )
 
 
 
